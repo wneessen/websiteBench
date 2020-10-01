@@ -1,0 +1,24 @@
+{
+  "name": "websiteBench",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wneessen/websiteBench.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/wneessen/websiteBench/issues"
+  },
+  "homepage": "https://github.com/wneessen/websiteBench#readme",
+  "dependencies": {
+    "influx": "^5.6.3",
+    "tslog": "^2.9.0"
+  }
+}
