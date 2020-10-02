@@ -10,5 +10,5 @@ RUN         chown -R websitebench:websitebench /opt/websiteBench
 WORKDIR     /opt/websiteBench
 USER        websitebench
 RUN         npm install
-VOLUME      [ "/opt/websiteBench/conf" ]
-ENTRYPOINT  ["/usr/bin/node", "dist/websiteBench.js", "--log-resource-errors", "--browserpath", "/usr/bin/chromium", "--no-sandbox"]
+VOLUME      ["/opt/websiteBench/conf"]
+ENTRYPOINT  ["/usr/bin/node", "dist/websiteBench.js", "--browserpath", "/usr/bin/chromium", "--no-sandbox"]
