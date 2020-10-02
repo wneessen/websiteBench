@@ -5,7 +5,7 @@ const process_1 = require("process");
 class WebsiteBenchConfig {
     constructor(confFiles, logObj) {
         this._configObj = {};
-        this._versionNum = '1.2.1';
+        this._versionNum = '1.2.2';
         this._allowCaching = false;
         this._logResourceErrors = false;
         this._maxConcurrentJobs = 5;

@@ -24,7 +24,11 @@ const confFiles: IConfigFiles = {
 };
 const pupLaunchOptions: Puppeteer.LaunchOptions = {
     headless: true,
-    devtools: true,
+    devtools: false,
+    defaultViewport: {
+        width: 1920,
+        height: 1440
+    },
     args: [],
 };
 
@@ -79,7 +83,6 @@ if(
 ) {
     if(typeof cliArgs["--browserpath"] === 'undefined') {
         logObj.error('Error: Parameter --browsertype requires a custom browser path via --browserpath');
-        showHelp();
         process.exit(1);
     }
     else {
