@@ -1,8 +1,8 @@
 {
-  "name": "websiteBench",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "website-bench",
+  "version": "1.2.0",
+  "description": "Collect browser-based website performance and publish in InfluxDB",
+  "main": "dist/websiteBench.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -11,8 +11,8 @@
     "url": "git+https://github.com/wneessen/websiteBench.git"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Winfried Neessen <wn@neessen.net>",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/wneessen/websiteBench/issues"
   },

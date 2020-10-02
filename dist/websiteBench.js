@@ -179,6 +179,11 @@ function showHelp() {
     console.log('Usage: node websiteBench.js [arguments]');
     console.log('  -c, --config <filepath>\t\tUse <filepath> as config file (Default: ./conf/websitebench.conf)');
     console.log('  -s, --secrets <filepath>\t\tUse <filepath> as secrets file (Default: ./conf/websitebench.secrets.conf)');
+    console.log('  --log-resource-errors\t\t\tIf set, the browser will start in non-headless mode');
+    console.log('  --no-headless\t\t\t\tIf set, the browser will start in non-headless mode');
+    console.log('  --no-sandbox\t\t\t\tIf set, the browser is started in no-sandbox mode (DANGER: Only use if you are sure what you are doing)');
+    console.log('  --browserpath <path>\t\t\tPath to browser executable (Using Firefox requires --browsertype firefox)');
+    console.log('  --browsertype <firefox|chrome>\tType of browser to use (Requires --browserpath to be set)');
     console.log('  -d, --debug\t\t\t\tEnable DEBUG mode');
     console.log('  -h, --help\t\t\t\tShow this help text');
 }
