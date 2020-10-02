@@ -133,7 +133,7 @@ logObj.attachTransport({
     warn: toolsObj.logToFile,
     error: toolsObj.logToFile,
     fatal: toolsObj.logToFile,
-}, 'debug');
+}, configObj.logLevel);
 const influxClient = new influx_1.InfluxDB({
     database: configObj.influxDb.database,
     username: configObj.influxDb.username,

@@ -8,7 +8,7 @@ export default class WebsiteBenchConfig {
     private _configObj: IWebsiteBenchConfig = {};
 
     // Defaults config settings
-    private _versionNum = '1.2.0';
+    private _versionNum = '1.2.1';
     private _allowCaching = false;
     private _logResourceErrors = false;
     private _maxConcurrentJobs = 5;
@@ -61,7 +61,7 @@ export default class WebsiteBenchConfig {
         }
 
         // Update some final settings
-        this.logObj.settings.minLevel = this._configObj.logLevel;
+        this.logObj.setSettings({minLevel: this._configObj.logLevel})
     }
 
     /**
