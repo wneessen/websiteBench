@@ -27,25 +27,25 @@ class WebsiteBenchBrowser {
             domContentTime: 0,
             domCompleteTime: 0,
         };
+        this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
+        const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
+        if (this.configObj.userAgent) {
+            await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
+                this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+            });
+        }
+        else {
+            let browserUserAgent = await this.browserObj.userAgent();
+            await pageObj.setUserAgent(`${browserUserAgent} websiteBench/${this.configObj.versionNum}`).catch(errorMsg => {
+                this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+            });
+        }
+        pageObj.setDefaultTimeout(reqTimeout * 1000);
+        pageObj.on('console', eventObj => this.eventTriggered(eventObj));
+        pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
+        pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
         for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
             this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
-            this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
-            const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
-            if (this.configObj.userAgent) {
-                await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
-                    this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
-                });
-            }
-            else {
-                let browserUserAgent = await this.browserObj.userAgent();
-                await pageObj.setUserAgent(`${browserUserAgent} websiteBench/${this.configObj.versionNum}`).catch(errorMsg => {
-                    this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
-                });
-            }
-            pageObj.setDefaultTimeout(reqTimeout * 1000);
-            pageObj.on('console', eventObj => this.eventTriggered(eventObj));
-            pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
-            pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj));
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
                 this.logObj.error(`An error occured during "Page Goto" => ${errorMsg}`);
             });
@@ -73,8 +73,8 @@ class WebsiteBenchBrowser {
                 perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
             }
             this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
-            pageObj.close();
         }
+        pageObj.close();
         perfData = {
             totalDurTime: (perfDataTotal.totalDurTime / this.numOfRetries),
             connectTime: (perfDataTotal.connectTime / this.numOfRetries),
@@ -92,11 +92,13 @@ class WebsiteBenchBrowser {
             eventObj.dismiss();
         }
     }
-    async errorTriggered(requestObj) {
-        this.logObj.error(`Unable to load resource URL => ${requestObj.url()}`);
-        this.logObj.error(`Request failed with an "${requestObj.failure().errorText}" error`);
-        if (requestObj.response()) {
-            this.logObj.error(`Resulting status: ${requestObj.response().status()} ${requestObj.response().statusText()}`);
+    async errorTriggered(requestObj, websiteEntry) {
+        if (this.configObj.logResErrors === true) {
+            this.logObj.error(`[${websiteEntry.siteName}] Unable to load resource URL => ${requestObj.url()}`);
+            this.logObj.error(`[${websiteEntry.siteName}] Request failed with an "${requestObj.failure().errorText}" error`);
+            if (requestObj.response()) {
+                this.logObj.error(`[${websiteEntry.siteName}] Resulting status: ${requestObj.response().status()} ${requestObj.response().statusText()}`);
+            }
         }
     }
     processPerformanceData(perfJson) {

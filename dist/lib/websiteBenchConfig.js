@@ -5,8 +5,9 @@ const process_1 = require("process");
 class WebsiteBenchConfig {
     constructor(confFiles, logObj) {
         this._configObj = {};
-        this._versionNum = '1.0.0';
+        this._versionNum = '1.1.0';
         this._allowCaching = false;
+        this._logResourceErrors = false;
         this._maxConcurrentJobs = 5;
         this._minCheckInterval = 30;
         this.logObj = null;
@@ -16,6 +17,7 @@ class WebsiteBenchConfig {
         this._configObj = Object.assign({
             allowCaching: this._allowCaching,
             maxConcurrentJobs: this._maxConcurrentJobs,
+            logResErrors: this._logResourceErrors,
             versionNum: this._versionNum,
         }, confFileData);
         this._configObj.influxDb = { ...this._configObj.influxDb, ...secretFileData.influxDb };

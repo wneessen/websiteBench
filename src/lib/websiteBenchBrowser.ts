@@ -44,35 +44,35 @@ export default class WebsiteBenchBrowser {
             domCompleteTime: 0,
         };
 
+
+        // Initialize Webbrowser page object (Incognito or not)
+        this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
+        const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
+
+        // Set User-Agent
+        if(this.configObj.userAgent) {
+            await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
+                this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+            });
+        }
+        else {
+            let browserUserAgent = await this.browserObj.userAgent();
+            await pageObj.setUserAgent(`${browserUserAgent} websiteBench/${this.configObj.versionNum}`).catch(errorMsg => {
+                this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+            });
+        }
+
+        // Set timeout
+        pageObj.setDefaultTimeout(reqTimeout * 1000);
+        
+        // Assign event handler
+        pageObj.on('console', eventObj => this.eventTriggered(eventObj));
+        pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
+        pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
+
         // Open the website for number of retries
         for(let runCount = 0; runCount < this.numOfRetries; runCount++) {
             this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`)
-
-            // Initialize Webbrowser page object (Incognito or not)
-            this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
-            const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
-
-            // Set User-Agent
-            if(this.configObj.userAgent) {
-                await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
-                    this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
-                });
-            }
-            else {
-                let browserUserAgent = await this.browserObj.userAgent();
-                await pageObj.setUserAgent(`${browserUserAgent} websiteBench/${this.configObj.versionNum}`).catch(errorMsg => {
-                    this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
-                });
-            }
-
-            // Set timeout
-            pageObj.setDefaultTimeout(reqTimeout * 1000);
-        
-            // Assign event handler
-            pageObj.on('console', eventObj => this.eventTriggered(eventObj));
-            pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
-            pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj));
-
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
                 this.logObj.error(`An error occured during "Page Goto" => ${errorMsg}`)
             });
@@ -101,9 +101,10 @@ export default class WebsiteBenchBrowser {
             }
             this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
         
-            // Close the page
-            pageObj.close();
         }
+        
+        // Close the page
+        pageObj.close();
 
         // Calculate mean values of performance data
         perfData = {
@@ -141,11 +142,13 @@ export default class WebsiteBenchBrowser {
      * @returns {Promise<void>}
      * @memberof WebsiteBenchBrowser
     */
-    private async errorTriggered(requestObj: Puppeteer.Request): Promise<void> {
-        this.logObj.error(`Unable to load resource URL => ${requestObj.url()}`);
-        this.logObj.error(`Request failed with an "${requestObj.failure().errorText}" error`)
-        if(requestObj.response()) {
-            this.logObj.error(`Resulting status: ${requestObj.response().status()} ${requestObj.response().statusText()}`);
+    private async errorTriggered(requestObj: Puppeteer.Request, websiteEntry: IWebsiteEntry): Promise<void> {
+        if(this.configObj.logResErrors === true) {
+            this.logObj.error(`[${websiteEntry.siteName}] Unable to load resource URL => ${requestObj.url()}`);
+            this.logObj.error(`[${websiteEntry.siteName}] Request failed with an "${requestObj.failure().errorText}" error`)
+            if(requestObj.response()) {
+                this.logObj.error(`[${websiteEntry.siteName}] Resulting status: ${requestObj.response().status()} ${requestObj.response().statusText()}`);
+            }
         }
     }
 

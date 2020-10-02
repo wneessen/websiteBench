@@ -49,6 +49,7 @@ try {
         '--ignore-ssl-errors': Boolean,
         '--no-headless': Boolean,
         '--no-sandbox': Boolean,
+        '--log-resource-errors': Boolean,
         '--help': Boolean,
         '--debug': Boolean,
 
@@ -88,6 +89,7 @@ if(
 
 // Read config files to create config object
 const configObj = new WebsiteBenchConfig(confFiles, logObj).configObj();
+if(typeof cliArgs["--log-resource-errors"] !== 'undefined') { configObj.logResErrors = cliArgs["--log-resource-errors"] };
 
 // Additional CLI params handling
 if(typeof cliArgs["--help"] !== 'undefined') { showHelp(); process.exit(0); };

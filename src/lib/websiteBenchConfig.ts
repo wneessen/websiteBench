@@ -8,8 +8,9 @@ export default class WebsiteBenchConfig {
     private _configObj: IWebsiteBenchConfig = {};
 
     // Defaults config settings
-    private _versionNum = '1.0.0';
+    private _versionNum = '1.1.0';
     private _allowCaching = false;
+    private _logResourceErrors = false;
     private _maxConcurrentJobs = 5;
     private _minCheckInterval = 30;
     private logObj: Logger = null;
@@ -31,6 +32,7 @@ export default class WebsiteBenchConfig {
         this._configObj = Object.assign({
             allowCaching: this._allowCaching,
             maxConcurrentJobs: this._maxConcurrentJobs,
+            logResErrors: this._logResourceErrors,
             versionNum: this._versionNum,
         }, confFileData);
         this._configObj.influxDb = {...this._configObj.influxDb, ...secretFileData.influxDb};

@@ -11,6 +11,7 @@ interface IWebsiteBenchConfig {
     influxDb?: IInfluxDbConfig,
     allowCaching?: boolean,
     userAgent?: string,
+    logResErrors?: boolean,
     maxConcurrentJobs?: number,
     versionNum?: string,
     logLevel?: 'silly'|'trace'|'debug'|'info'|'warn'|'error'|'fatal',
