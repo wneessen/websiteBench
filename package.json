@@ -19,6 +19,7 @@
   "homepage": "https://github.com/wneessen/websiteBench#readme",
   "dependencies": {
     "influx": "^5.6.3",
+    "puppeteer": "^5.3.1",
     "tslog": "^2.9.0"
   }
 }

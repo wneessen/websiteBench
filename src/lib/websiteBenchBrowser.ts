@@ -1,13 +1,14 @@
 import Puppeteer from 'puppeteer';
 import WebsiteBenchTools from './websiteBenchTools';
 import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry } from './websiteBenchInterfaces';
-import { isThisTypeNode } from 'typescript';
+import { Logger } from 'tslog';
 
 export default class WebsiteBenchBrowser {
     private browserObj: Puppeteer.Browser;
     private browserCtx: Puppeteer.BrowserContext;
     private configObj: IWebsiteBenchConfig;
     private toolsObj = new WebsiteBenchTools();
+    private logObj: Logger = null;
     private numOfRetries = 3;
     
     /**
@@ -16,9 +17,10 @@ export default class WebsiteBenchBrowser {
      * @constructor
      * @memberof WebsiteBenchBrowser
     */
-    constructor(browserObj: Puppeteer.Browser, configObj: IWebsiteBenchConfig) {
+    constructor(browserObj: Puppeteer.Browser, configObj: IWebsiteBenchConfig, logObj: Logger) {
         this.browserObj = browserObj;
         this.configObj  = configObj;
+        this.logObj = logObj;
     }
 
     /**
@@ -31,22 +33,7 @@ export default class WebsiteBenchBrowser {
         const webUrl = websiteEntry.siteUrl;
         const reqTimeout = websiteEntry.checkInterval - 1;
         let perfData: IPerformanceData = null;
-
-        // Initialize Webbrowser page object
-        this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
-        const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
-        await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
-            console.error(`Unable to set User-Agent string: ${errorMsg}`);
-        });
-        await pageObj.setDefaultTimeout(reqTimeout * 1000);
-        
-        // Event handler
-        pageObj.on('console', eventObj => this.eventTriggered(eventObj));
-        pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
-        pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj));
-
-        // Open the website
-        let perfDataTotal: IPerformanceData = {
+        const perfDataTotal: IPerformanceData = {
             totalDurTime: 0,
             connectTime: 0,
             dnsTime: 0,
@@ -56,22 +43,50 @@ export default class WebsiteBenchBrowser {
             domContentTime: 0,
             domCompleteTime: 0,
         };
+
+        // Open the website for number of retries
         for(let runCount = 0; runCount < this.numOfRetries; runCount++) {
-            console.log(`Collecting performance data - Run no. ${runCount}`);
-            const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' } ).catch(errorMsg => {
-                console.error(`An error occured during "Page Goto" => ${errorMsg}`)
+            this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`)
+
+            // Initialize Webbrowser page object (Incognito or not)
+            this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
+            const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
+
+            // Set User-Agent
+            if(this.configObj.userAgent) {
+                await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
+                    this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+                });
+            }
+            else {
+                let browserUserAgent = await this.browserObj.userAgent();
+                await pageObj.setUserAgent(`${browserUserAgent} websiteBench/${this.configObj.versionNum}`).catch(errorMsg => {
+                    this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+                });
+            }
+
+            // Set timeout
+            pageObj.setDefaultTimeout(reqTimeout * 1000);
+        
+            // Assign event handler
+            pageObj.on('console', eventObj => this.eventTriggered(eventObj));
+            pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
+            pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj));
+
+            const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
+                this.logObj.error(`An error occured during "Page Goto" => ${errorMsg}`)
             });
             if(!httpResponse) return;
 
             // Evaluate the page (with or without performance data)
             const perfElementHandler = await pageObj.$('pageData').catch(errorMsg => {
-                console.error(`An error occured during "Performance Element Handling" => ${errorMsg}`);
+                this.logObj.error(`An error occured during "Performance Element Handling" => ${errorMsg}`);
             });
             if(typeof perfElementHandler !== 'object') return;
             const perfJson = await pageObj.evaluate(pageData => {
                 return JSON.stringify(performance.getEntriesByType('navigation'));
             }, perfElementHandler).catch(errorMsg => {
-                console.error(`An error occured "Page evaluation" => ${errorMsg}`)
+                this.logObj.error(`An error occured "Page evaluation" => ${errorMsg}`)
             });
             if(perfJson) {
                 let tempPerf = this.processPerformanceData(perfJson);
@@ -84,11 +99,13 @@ export default class WebsiteBenchBrowser {
                 perfDataTotal.domContentTime += tempPerf.domContentTime;
                 perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
             }
-
+            this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
+        
+            // Close the page
+            pageObj.close();
         }
-        // Close the page
-        pageObj.close();
 
+        // Calculate mean values of performance data
         perfData = {
             totalDurTime: (perfDataTotal.totalDurTime / this.numOfRetries),
             connectTime: (perfDataTotal.connectTime / this.numOfRetries),
@@ -99,19 +116,17 @@ export default class WebsiteBenchBrowser {
             domContentTime: (perfDataTotal.domContentTime / this.numOfRetries),
             domCompleteTime: (perfDataTotal.domCompleteTime / this.numOfRetries)
         }
-        console.log('Commulative perf data:');
-        console.log(perfData)
 
         // Finalize response data
         return perfData;
     }
-
+    
     /**
      * Eventhandler for when an event in the website fired
      *
      * @param {Puppeteer.ConsoleMessage|Puppeteer.Dialog} eventObj The Puppeteer event object
      * @returns {Promise<void>}
-     * @memberof XssScanner
+     * @memberof WebsiteBenchBrowser
     */
     private async eventTriggered(eventObj: Puppeteer.ConsoleMessage | Puppeteer.Dialog): Promise<void> {
         if(this.toolsObj.eventIsDialog(eventObj)) {
@@ -124,13 +139,13 @@ export default class WebsiteBenchBrowser {
      *
      * @param {Puppeteer.Request} requestObj The Puppeteer request object
      * @returns {Promise<void>}
-     * @memberof XssScanner
+     * @memberof WebsiteBenchBrowser
     */
     private async errorTriggered(requestObj: Puppeteer.Request): Promise<void> {
-        console.error(`Unable to load resource URL => ${requestObj.url()}`);
-        console.error(`Request failed with an "${requestObj.failure().errorText}" error`)
+        this.logObj.error(`Unable to load resource URL => ${requestObj.url()}`);
+        this.logObj.error(`Request failed with an "${requestObj.failure().errorText}" error`)
         if(requestObj.response()) {
-            console.error(`Resulting status: ${requestObj.response().status()} ${requestObj.response().statusText()}`);
+            this.logObj.error(`Resulting status: ${requestObj.response().status()} ${requestObj.response().statusText()}`);
         }
     }
 
@@ -139,7 +154,7 @@ export default class WebsiteBenchBrowser {
      *
      * @param {string} perfJson Stringified JSON data of the Performance object
      * @returns {IPerformanceData}
-     * @memberof XssScanner
+     * @memberof WebsiteBenchBrowser
     */
     private processPerformanceData(perfJson: string): IPerformanceData {
         let perfData = Object.assign({});

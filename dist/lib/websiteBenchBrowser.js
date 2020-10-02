@@ -5,26 +5,19 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const websiteBenchTools_1 = __importDefault(require("./websiteBenchTools"));
 class WebsiteBenchBrowser {
-    constructor(browserObj, configObj) {
+    constructor(browserObj, configObj, logObj) {
         this.toolsObj = new websiteBenchTools_1.default();
+        this.logObj = null;
         this.numOfRetries = 3;
         this.browserObj = browserObj;
         this.configObj = configObj;
+        this.logObj = logObj;
     }
     async processPage(websiteEntry) {
         const webUrl = websiteEntry.siteUrl;
         const reqTimeout = websiteEntry.checkInterval - 1;
         let perfData = null;
-        this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
-        const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
-        await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
-            console.error(`Unable to set User-Agent string: ${errorMsg}`);
-        });
-        await pageObj.setDefaultTimeout(reqTimeout * 1000);
-        pageObj.on('console', eventObj => this.eventTriggered(eventObj));
-        pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
-        pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj));
-        let perfDataTotal = {
+        const perfDataTotal = {
             totalDurTime: 0,
             connectTime: 0,
             dnsTime: 0,
@@ -35,21 +28,38 @@ class WebsiteBenchBrowser {
             domCompleteTime: 0,
         };
         for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-            console.log(`Collecting performance data - Run no. ${runCount}`);
+            this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
+            this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
+            const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
+            if (this.configObj.userAgent) {
+                await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
+                    this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+                });
+            }
+            else {
+                let browserUserAgent = await this.browserObj.userAgent();
+                await pageObj.setUserAgent(`${browserUserAgent} websiteBench/${this.configObj.versionNum}`).catch(errorMsg => {
+                    this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+                });
+            }
+            pageObj.setDefaultTimeout(reqTimeout * 1000);
+            pageObj.on('console', eventObj => this.eventTriggered(eventObj));
+            pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
+            pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj));
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
-                console.error(`An error occured during "Page Goto" => ${errorMsg}`);
+                this.logObj.error(`An error occured during "Page Goto" => ${errorMsg}`);
             });
             if (!httpResponse)
                 return;
             const perfElementHandler = await pageObj.$('pageData').catch(errorMsg => {
-                console.error(`An error occured during "Performance Element Handling" => ${errorMsg}`);
+                this.logObj.error(`An error occured during "Performance Element Handling" => ${errorMsg}`);
             });
             if (typeof perfElementHandler !== 'object')
                 return;
             const perfJson = await pageObj.evaluate(pageData => {
                 return JSON.stringify(performance.getEntriesByType('navigation'));
             }, perfElementHandler).catch(errorMsg => {
-                console.error(`An error occured "Page evaluation" => ${errorMsg}`);
+                this.logObj.error(`An error occured "Page evaluation" => ${errorMsg}`);
             });
             if (perfJson) {
                 let tempPerf = this.processPerformanceData(perfJson);
@@ -62,8 +72,9 @@ class WebsiteBenchBrowser {
                 perfDataTotal.domContentTime += tempPerf.domContentTime;
                 perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
             }
+            this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
+            pageObj.close();
         }
-        pageObj.close();
         perfData = {
             totalDurTime: (perfDataTotal.totalDurTime / this.numOfRetries),
             connectTime: (perfDataTotal.connectTime / this.numOfRetries),
@@ -74,8 +85,6 @@ class WebsiteBenchBrowser {
             domContentTime: (perfDataTotal.domContentTime / this.numOfRetries),
             domCompleteTime: (perfDataTotal.domCompleteTime / this.numOfRetries)
         };
-        console.log('Commulative perf data:');
-        console.log(perfData);
         return perfData;
     }
     async eventTriggered(eventObj) {
@@ -84,10 +93,10 @@ class WebsiteBenchBrowser {
         }
     }
     async errorTriggered(requestObj) {
-        console.error(`Unable to load resource URL => ${requestObj.url()}`);
-        console.error(`Request failed with an "${requestObj.failure().errorText}" error`);
+        this.logObj.error(`Unable to load resource URL => ${requestObj.url()}`);
+        this.logObj.error(`Request failed with an "${requestObj.failure().errorText}" error`);
         if (requestObj.response()) {
-            console.error(`Resulting status: ${requestObj.response().status()} ${requestObj.response().statusText()}`);
+            this.logObj.error(`Resulting status: ${requestObj.response().status()} ${requestObj.response().statusText()}`);
         }
     }
     processPerformanceData(perfJson) {

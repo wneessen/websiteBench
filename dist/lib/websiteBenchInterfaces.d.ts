@@ -3,8 +3,9 @@ interface IWebsiteBenchConfig {
     influxDb?: IInfluxDbConfig;
     allowCaching?: boolean;
     userAgent?: string;
-    logLevel?: 'silly' | 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
     maxConcurrentJobs?: number;
+    versionNum?: string;
+    logLevel?: 'silly' | 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 }
 interface IWebsiteEntry {
     siteName: string;
@@ -18,7 +19,8 @@ interface IInfluxDbConfig {
     path?: string;
     protocol?: 'http' | 'https';
     ignoressl?: boolean;
-    credentials: IUserCredentials;
+    username?: string;
+    password?: string;
 }
 interface IUserCredentials {
     username: string;
@@ -39,5 +41,9 @@ interface IConfigError {
     errorProperty?: string;
     errorMessage?: string;
 }
-export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError };
+interface IConfigFiles {
+    configFile: string;
+    secretsFile: string;
+}
+export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles };
 //# sourceMappingURL=websiteBenchInterfaces.d.ts.map

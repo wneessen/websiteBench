@@ -1,5 +1,5 @@
 // websiteBench Config Class
-import { IWebsiteBenchConfig, IConfigError } from './websiteBenchInterfaces';
+import { IWebsiteBenchConfig, IConfigError, IConfigFiles } from './websiteBenchInterfaces';
 import { readFileSync } from 'fs';
 import { exit } from 'process';
 import { Logger } from 'tslog';
@@ -8,8 +8,7 @@ export default class WebsiteBenchConfig {
     private _configObj: IWebsiteBenchConfig = {};
 
     // Defaults config settings
-    private _versionNum = '0.1.0.';
-    private _defaultUserAgent = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36 websiteBench/${this._versionNum}`
+    private _versionNum = '1.0.0';
     private _allowCaching = false;
     private _maxConcurrentJobs = 5;
     private _minCheckInterval = 30;
@@ -21,18 +20,18 @@ export default class WebsiteBenchConfig {
      * @constructor
      * @memberof WebsiteBenchConfig
     */
-    constructor(confFile: string, secretsFile: string, logObj: Logger) {
+    constructor(confFiles: IConfigFiles, logObj: Logger) {
         this.logObj = logObj;
 
         // Read config files
-        let confFileData = this.readConfig(confFile);
-        let secretFileData = this.readConfig(secretsFile);
+        let confFileData = this.readConfig(confFiles.configFile);
+        let secretFileData = this.readConfig(confFiles.secretsFile);
 
         // Construct the config object
         this._configObj = Object.assign({
             allowCaching: this._allowCaching,
-            userAgent: this._defaultUserAgent,
-            maxConcurrentJobs: this._maxConcurrentJobs
+            maxConcurrentJobs: this._maxConcurrentJobs,
+            versionNum: this._versionNum,
         }, confFileData);
         this._configObj.influxDb = {...this._configObj.influxDb, ...secretFileData.influxDb};
 
@@ -81,7 +80,7 @@ export default class WebsiteBenchConfig {
     */
     private checkMandatory(): void {
         // Make sure all mandatory
-        const mandatoryProps = ['userAgent', 'maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb'];
+        const mandatoryProps = ['maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb'];
         const mandatoryInflux = ['hostname', 'database', 'username', 'password'];
         let missingProps: string = null;
         for(const objProp of mandatoryProps) {

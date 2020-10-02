@@ -11,8 +11,9 @@ interface IWebsiteBenchConfig {
     influxDb?: IInfluxDbConfig,
     allowCaching?: boolean,
     userAgent?: string,
-    logLevel?: 'silly'|'trace'|'debug'|'info'|'warn'|'error'|'fatal',
     maxConcurrentJobs?: number,
+    versionNum?: string,
+    logLevel?: 'silly'|'trace'|'debug'|'info'|'warn'|'error'|'fatal',
 }
 
 /**
@@ -38,7 +39,8 @@ interface IInfluxDbConfig {
     path?: string,
     protocol?: 'http'|'https',
     ignoressl?: boolean,
-    credentials: IUserCredentials
+    username?: string,
+    password?: string
 }
 
 /**
@@ -78,5 +80,16 @@ interface IConfigError {
     errorMessage?: string
 }
 
+/**
+ * Config files object
+ *
+ * @interface IConfigFiles
+*/
+interface IConfigFiles {
+    configFile: string,
+    secretsFile: string
+}
+
+
 // Exports
-export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError }
+export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles }

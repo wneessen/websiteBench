@@ -1,4 +1,7 @@
+import { IWebsiteBenchConfig } from './websiteBenchInterfaces';
 import Puppeteer from 'puppeteer';
+import { ILogObject } from 'tslog'
+import { appendFile } from 'fs';
 
 export default class WebsiteBenchTools {
     /**
@@ -12,7 +15,30 @@ export default class WebsiteBenchTools {
         return (inputEvent as Puppeteer.Dialog).dismiss !== undefined;
     }
 
+    /**
+     * Generate a (non-secure) random number
+     *
+     * @param {number} maxNum Highest random number to generate
+     * @returns {number}
+     * @memberof WebsiteBenchTools
+    */
     public getRandNum(maxNum: number) {
         return Math.floor(Math.random() * Math.floor(maxNum));
+    }
+
+    /**
+     * Log to file
+     *
+     * @param {ILogObject} logObject The tslog-log object
+     * @returns {Promise<void>}
+     * @memberof WebsiteBenchTools
+    */
+    public async logToFile(logObject: ILogObject): Promise<void> {
+        let logFile = 'log/websiteBench.log';
+        appendFile(logFile, JSON.stringify(logObject) + "\n", (logErr) => {
+            if(logErr) {
+                console.error(`An error occured while writing to logfile "${logFile}": ${logErr}`);
+            }
+        });
     }
 }

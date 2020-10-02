@@ -3,21 +3,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const process_1 = require("process");
 class WebsiteBenchConfig {
-    constructor(confFile, secretsFile, logObj) {
+    constructor(confFiles, logObj) {
         this._configObj = {};
-        this._versionNum = '0.1.0.';
-        this._defaultUserAgent = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36 websiteBench/${this._versionNum}`;
+        this._versionNum = '1.0.0';
         this._allowCaching = false;
         this._maxConcurrentJobs = 5;
         this._minCheckInterval = 30;
         this.logObj = null;
         this.logObj = logObj;
-        let confFileData = this.readConfig(confFile);
-        let secretFileData = this.readConfig(secretsFile);
+        let confFileData = this.readConfig(confFiles.configFile);
+        let secretFileData = this.readConfig(confFiles.secretsFile);
         this._configObj = Object.assign({
             allowCaching: this._allowCaching,
-            userAgent: this._defaultUserAgent,
-            maxConcurrentJobs: this._maxConcurrentJobs
+            maxConcurrentJobs: this._maxConcurrentJobs,
+            versionNum: this._versionNum,
         }, confFileData);
         this._configObj.influxDb = { ...this._configObj.influxDb, ...secretFileData.influxDb };
         try {
@@ -45,7 +44,7 @@ class WebsiteBenchConfig {
         return this._configObj;
     }
     checkMandatory() {
-        const mandatoryProps = ['userAgent', 'maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb'];
+        const mandatoryProps = ['maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb'];
         const mandatoryInflux = ['hostname', 'database', 'username', 'password'];
         let missingProps = null;
         for (const objProp of mandatoryProps) {
