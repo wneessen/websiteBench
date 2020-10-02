@@ -41,7 +41,11 @@ const confFiles = {
 };
 const pupLaunchOptions = {
     headless: true,
-    devtools: true,
+    devtools: false,
+    defaultViewport: {
+        width: 1920,
+        height: 1440
+    },
     args: [],
 };
 const logObj = new tslog_1.Logger({
@@ -102,7 +106,6 @@ if (typeof cliArgs["--browsertype"] !== 'undefined' &&
     (cliArgs["--browsertype"].toLowerCase() === 'firefox' || cliArgs["--browsertype"].toLowerCase() === 'chrome')) {
     if (typeof cliArgs["--browserpath"] === 'undefined') {
         logObj.error('Error: Parameter --browsertype requires a custom browser path via --browserpath');
-        showHelp();
         process_1.default.exit(1);
     }
     else {
