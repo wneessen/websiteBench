@@ -107,7 +107,7 @@ logObj.attachTransport(
         error:  toolsObj.logToFile,
         fatal:  toolsObj.logToFile,
     },
-    'debug'
+    configObj.logLevel
 );
 
 // Initialize InfluxDB object
