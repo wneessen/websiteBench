@@ -35,21 +35,23 @@ After the installation completed you are ready to run
 ### Docker image
 There is a [Docker image](https://hub.docker.com/r/wneessen/website-bench) for websiteBench available on DockerHub.
 
-**Important note: Due to the architecture of Docker, the service has to run the Chromium browser in "[no-sandbox](https://chromium.googlesource.com/chromium/src/+/master/docs/design/sandbox.md)" mode. Yes, Docker is sandboxing as well, but I cannot guarantee, that the same security environment will be given, as if you are running locally without Docker (with Chromiums sandbox-mode enabled). Therefore please make sure to use the Docker image at your own risk.**
-
 To run the Docker image simply issue the following command:
 - Download the docker image
   ```sh
   $ sudo docker pull wneessen/website-bench:prod
   ```
-- Once downloaded you need to create a config directory for a local config- and secrets file:
+- Once downloaded you need to create a config and log directory for a local config- and secrets file:
   ```sh
-  $ sudo mkdir /var/db/websiteBench/config
+  $ sudo mkdir /var/db/websiteBench/config /var/db/websiteBench/log
   ```
   (Adjust the ```/var/db/websiteBench/config``` path according to your local environment)
+- Because of the security settings in docker, we need to run it with a specific seccomp-profile, otherwise Chrome will not be able to run. Therefore you need to download the profile file first:
+  ```sh
+  $ curl -LO https://raw.githubusercontent.com/wneessen/websiteBench/master/wb-seccomp.json
+  ```
 - Run the docker image
   ```sh
-  $ docker run -v /var/db/websiteBench/config/:/opt/websiteBench/conf/ website-bench:prod -c conf/yourconfig.conf
+  $ docker run --security-opt seccomp=wb-seccomp.json -v /var/db/websiteBench/config/:/opt/websiteBench/conf/ -v /var/db/websiteBench/log/:/opt/websiteBench/log/ website-bench:prod -c conf/yourconfig.conf
   ```
   (You can add additional CLI parameters if needed)
 
