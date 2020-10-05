@@ -4,6 +4,7 @@ export default class WebsiteBenchConfig {
     private _configObj;
     private _versionNum;
     private _allowCaching;
+    private _ignoreSslErrors;
     private _logResourceErrors;
     private _maxConcurrentJobs;
     private _minCheckInterval;

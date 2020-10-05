@@ -3,10 +3,12 @@ websiteBench will measure website performance and propagate the results into an 
 
 ## Requirements
 This service requires some NodeJS and some modules to work:
-- [NodeJS](https://nodejs.org/en/)
-- [Google Puppeteer](https://pptr.dev/)
 - [Arg](https://www.npmjs.com/package/arg)
 - [Node-Influx](https://node-influx.github.io/)
+- [NodeJS](https://nodejs.org/en/)
+- [node-libcurl](https://github.com/JCMais/node-libcurl/)
+- [Google Puppeteer](https://pptr.dev/)
+- [Q](https://github.com/kriskowal/q)
 - [tslog](https://tslog.js.org/)
 
 The modules should be automagically be installed by running: ```npm install```
@@ -63,7 +65,8 @@ The config accepts the following options:
         {
             "siteName": "Your Site No. 1",
             "siteUrl": "https://example.com/fooo.html",
-            "checkInterval": 130
+            "checkInterval": 130,
+            "checkType": "curl"
         },
         {
             "siteName": "Your other great Site",
@@ -79,14 +82,19 @@ The config accepts the following options:
         "database": "websitebench",
         "ignoressl": false
     },
-    "allowCaching": false
+    "allowCaching": false,
+	  "logLevel": "info",
+    "maxConcurrentJobs": 5,
+    "instanceName": "DC1-CGN-I1"
 }
 ```
 - ```websiteList (Array<IWebEntry>)```: List of websites to collect performance data on
 - ```influxDb (IInfluxDbConfig)```: InfluxDB config settings
 - ```allowCaching (Boolean)```: If set, the browser will not open Incognito instances, but simple new pages
 - ```userAgent (String)```: Override the browser User-Agent
+- ```instanceName (String)```: Name of the instance running the checks (will be tagged in InfluxDB accordingly)
 - ```logResErrors (Boolean)```: If set, resource errors of the web requests will be logged (same as ```--log-resource-errors```)
+- ```ignoreSslErrors (Boolean)```: If set, Chrome/cURL will not error on invalid SSL certificates
 - ```maxConcurrentJobs (Number)```: Number of concurrently executed performance checks
 - ```logLevel (ILogLevel)```: Define the loglevel
 
@@ -95,6 +103,7 @@ The config accepts the following options:
   -  ```siteName (String)```: The name of the site you are monitoring (will be the tag in the InfluxDB)
   -  ```siteUrl (String)```: The URL to monitor
   -  ```checkInterval (Number)```: The interval to perform the checks on (in seconds). Minimum value is 60 seconds.
+  -  ```checkType (String)```: The type of performance check to run. Can be either "curl" or "browser" (Default: browser)
 - ```IInfluxDbConfig (Object)```: Consists of the following settings:
   -  ```hostname (String)```: Hostname or IP of the InfluxDB server
   -  ```database (String)```: InfluxDB database name to store the metrics in
@@ -109,11 +118,11 @@ The server provides the following CLI parameters to override defaults
 
 - ```-c, --config <filepath> ```: Path to config file
 - ```-s, --secrets <filepath> ```: Path to secrets config file
-- ```--ignore-ssl-errors```: Ignore HTTPS errors
-- ```--log-resource-errors```: If set, resource errors of the web requests will be logged
 - ```-d, --debug```: Enable DEBUG mode (more logging)
 - ```--no-headless```: If set, the browser will start in non-headless mode
 - ```--no-sandbox```: If set, the browser is started in no-sandbox mode (**DANGEROUS**: Only use if you are sure what you are doing)
+- ```--ignore-ssl-errors```: Ignore HTTPS errors
+- ```--log-resource-errors```: If set, resource errors of the web requests will be logged
 - ```--browserpath <path to browser executabel>```: Run Puppeteer with a different browser (Chrome/Firefox supported)
 - ```--browsertype <chrome|firefox>```: Run Puppeteer with a different browser type (Requires: --browserpath to be set)
 

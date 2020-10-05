@@ -85,10 +85,6 @@ if (typeof cliArgs["--secrets"] !== 'undefined') {
     confFiles.secretsFile = cliArgs["--secrets"];
 }
 ;
-if (typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') {
-    pupLaunchOptions.ignoreHTTPSErrors = true;
-}
-;
 if (typeof cliArgs["--no-headless"] !== 'undefined') {
     pupLaunchOptions.headless = false;
 }
@@ -115,6 +111,11 @@ if (typeof cliArgs["--browsertype"] !== 'undefined' &&
 const configObj = new websiteBenchConfig_1.default(confFiles, logObj).configObj();
 if (typeof cliArgs["--log-resource-errors"] !== 'undefined') {
     configObj.logResErrors = cliArgs["--log-resource-errors"];
+}
+;
+if (typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') {
+    pupLaunchOptions.ignoreHTTPSErrors = true;
+    configObj.ignoreSslErrors = true;
 }
 ;
 if (typeof cliArgs["--help"] !== 'undefined') {

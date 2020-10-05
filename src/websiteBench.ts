@@ -73,7 +73,6 @@ catch(errorObj) {
 // Set options via CLI params
 if(typeof cliArgs["--config"] !== 'undefined') { confFiles.configFile = cliArgs["--config"] };
 if(typeof cliArgs["--secrets"] !== 'undefined') { confFiles.secretsFile = cliArgs["--secrets"] };
-if(typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') { pupLaunchOptions.ignoreHTTPSErrors = true };
 if(typeof cliArgs["--no-headless"] !== 'undefined') { pupLaunchOptions.headless = false; };
 if(typeof cliArgs["--no-sandbox"] !== 'undefined') { pupLaunchOptions.args.push('--no-sandbox'); };
 if(typeof cliArgs["--browserpath"] !== 'undefined') { pupLaunchOptions.executablePath = cliArgs["--browserpath"] };
@@ -93,6 +92,7 @@ if(
 // Read config files to create config object
 const configObj = new WebsiteBenchConfig(confFiles, logObj).configObj();
 if(typeof cliArgs["--log-resource-errors"] !== 'undefined') { configObj.logResErrors = cliArgs["--log-resource-errors"] };
+if(typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') { pupLaunchOptions.ignoreHTTPSErrors = true; configObj.ignoreSslErrors = true };
 
 // Additional CLI params handling
 if(typeof cliArgs["--help"] !== 'undefined') { showHelp(); process.exit(0); };

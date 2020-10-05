@@ -14,6 +14,8 @@ interface IWebsiteBenchConfig {
     logResErrors?: boolean,
     maxConcurrentJobs?: number,
     versionNum?: string,
+    instanceName?: string,
+    ignoreSslErrors?: boolean,
     logLevel?: 'silly'|'trace'|'debug'|'info'|'warn'|'error'|'fatal',
 }
 

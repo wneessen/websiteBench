@@ -132,20 +132,21 @@ export default class WebsiteBenchEvents extends EventEmitter {
                 {
                     measurement: 'benchmark',
                     tags: {
-                        website: websiteEntry.siteName
+                        website: websiteEntry.siteName,
+                        instance: this._configObj.instanceName,
                     },
                     fields: {
-                        total: perfJson.totalDurTime ? perfJson.totalDurTime : 0,
-                        dns: perfJson.dnsTime ? perfJson.dnsTime : 0,
-                        connect: perfJson.connectTime ? perfJson.connectTime : 0,
-                        ttfb: perfJson.ttfbTime ? perfJson.ttfbTime : 0,
-                        download: perfJson.downloadTime ? perfJson.downloadTime : 0,
-                        tlsHandshake: perfJson.tlsHandshake ? perfJson.tlsHandshake : 0,
-                        preTransfer: perfJson.preTransfer ? perfJson.preTransfer : 0,
+                        total: perfJson.totalDurTime ? perfJson.totalDurTime : -1,
+                        dns: perfJson.dnsTime ? perfJson.dnsTime : -1,
+                        connect: perfJson.connectTime ? perfJson.connectTime : -1,
+                        ttfb: perfJson.ttfbTime ? perfJson.ttfbTime : -1,
+                        download: perfJson.downloadTime ? perfJson.downloadTime : -1,
+                        tlsHandshake: perfJson.tlsHandshake ? perfJson.tlsHandshake : -1,
+                        preTransfer: perfJson.preTransfer ? perfJson.preTransfer : -1,
                         statusCodes: perfJson.statusCodesString ? perfJson.statusCodesString : '',
-                        dom_int: perfJson.domIntTime ? perfJson.domIntTime : 0,
-                        dom_content: perfJson.domContentTime ? perfJson.domContentTime : 0,
-                        dom_complete: perfJson.domCompleteTime ? perfJson.domCompleteTime : 0
+                        dom_int: perfJson.domIntTime ? perfJson.domIntTime : -1,
+                        dom_content: perfJson.domContentTime ? perfJson.domContentTime : -1,
+                        dom_complete: perfJson.domCompleteTime ? perfJson.domCompleteTime : -1
                     }
                 }
             ]).catch(errorObj => {

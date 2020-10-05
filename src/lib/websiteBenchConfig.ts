@@ -8,8 +8,9 @@ export default class WebsiteBenchConfig {
     private _configObj: IWebsiteBenchConfig = {};
 
     // Defaults config settings
-    private _versionNum = '1.3.0-dev';
+    private _versionNum = '1.3.2';
     private _allowCaching = false;
+    private _ignoreSslErrors = false;
     private _logResourceErrors = false;
     private _maxConcurrentJobs = 5;
     private _minCheckInterval = 30;
@@ -33,6 +34,7 @@ export default class WebsiteBenchConfig {
             allowCaching: this._allowCaching,
             maxConcurrentJobs: this._maxConcurrentJobs,
             logResErrors: this._logResourceErrors,
+            ignoreSslErrors: this._ignoreSslErrors,
             versionNum: this._versionNum
         }, confFileData);
         this._configObj.influxDb = {...this._configObj.influxDb, ...secretFileData.influxDb};
@@ -82,7 +84,7 @@ export default class WebsiteBenchConfig {
     */
     private checkMandatory(): void {
         // Make sure all mandatory
-        const mandatoryProps = ['maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb'];
+        const mandatoryProps = ['maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb', 'instanceName'];
         const mandatoryInflux = ['hostname', 'database', 'username', 'password'];
         let missingProps: string = null;
         for(const objProp of mandatoryProps) {

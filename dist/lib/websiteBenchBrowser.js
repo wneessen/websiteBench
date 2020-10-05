@@ -136,9 +136,11 @@ class WebsiteBenchBrowser {
                 this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
                 const deferObj = qObj.defer();
                 const curlObj = new node_libcurl_1.Curl();
-                curlObj.setOpt(node_libcurl_1.Curl.option.URL, webUrl);
-                curlObj.setOpt(node_libcurl_1.Curl.option.TIMEOUT, reqTimeout);
-                curlObj.setOpt(node_libcurl_1.Curl.option.USERAGENT, userAgent);
+                curlObj.setOpt('URL', webUrl);
+                curlObj.setOpt('TIMEOUT', reqTimeout);
+                curlObj.setOpt('USERAGENT', userAgent);
+                curlObj.setOpt('DNS_SHUFFLE_ADDRESSES', true);
+                curlObj.setOpt('SSL_VERIFYHOST', this.configObj.ignoreSslErrors === true ? false : true);
                 curlObj.on('end', (statusCode, resData, resHeader, curlInstance) => {
                     const tempPerf = {
                         runNumber: runCount,
@@ -155,7 +157,7 @@ class WebsiteBenchBrowser {
                 });
                 curlObj.on('error', (errorObj) => {
                     this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`);
-                    this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
+                    this.logObj.debug(`Completed performance data collection with error for ${webUrl} (Run: ${runCount})...`);
                 });
                 curlObj.perform();
                 promiseArray.push(deferObj.promise);
