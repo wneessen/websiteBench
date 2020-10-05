@@ -62,7 +62,7 @@ export default class WebsiteBenchEvents extends EventEmitter {
         }
 
         // Set the eventlistener
-        this.logObj.debug(`Adding EventListener for Site "${websiteObj.siteName}`);
+        this.logObj.debug(`Adding EventListener for Site "${websiteObj.siteName}"`);
         this.addListener(websiteObj.siteName, () => {
             setImmediate(() => {
                 this.checkSite(websiteObj);
@@ -94,7 +94,7 @@ export default class WebsiteBenchEvents extends EventEmitter {
 
         // Check if the max. amount of concurrent jobs is already reached
         if(this._currentlyRunning >= this._configObj.maxConcurrentJobs) {
-            this.logObj.debug(`Maximum of concurrent jobs is reached. Rescheduling job by ${(randDelay / 1000).toFixed(3)} seconds...`);
+            this.logObj.warn(`Maximum amount of concurrent jobs is reached. Delaying job by ${(randDelay / 1000).toFixed(3)} seconds...`);
             return setTimeout(() => {
                 this.emit(websiteEntry.siteName)
             }, randDelay);
@@ -102,8 +102,15 @@ export default class WebsiteBenchEvents extends EventEmitter {
 
         this._currentlyRunning++;
         setTimeout(async () => {
-            this.logObj.debug(`Executing perfomance check for site: ${websiteEntry.siteName}`);
-            let perfJson = await this._browserObj.processPage(websiteEntry);
+            let perfJson;
+            let checkType = ('checkType' in websiteEntry && websiteEntry.checkType === 'curl') ? 'cURL' : 'Browser';
+            this.logObj.debug(`Executing perfomance check for site: ${websiteEntry.siteName} (via ${checkType})`);
+            if(checkType === 'cURL') {
+                perfJson = await this._browserObj.processPageWithCurl(websiteEntry);
+            }
+            else {
+                perfJson = await this._browserObj.processPageWithBrowser(websiteEntry);
+            }
             this._currentlyRunning--;
 
             // Send successfully gathered data to InfluxDB
@@ -125,17 +132,21 @@ export default class WebsiteBenchEvents extends EventEmitter {
                 {
                     measurement: 'benchmark',
                     tags: {
-                        website: websiteEntry.siteName
+                        website: websiteEntry.siteName,
+                        instance: this._configObj.instanceName,
                     },
                     fields: {
-                        total: perfJson.totalDurTime,
-                        dns: perfJson.dnsTime,
-                        connect: perfJson.connectTime,
-                        ttfb: perfJson.ttfbTime,
-                        download: perfJson.downloadTime,
-                        dom_int: perfJson.domIntTime,
-                        dom_content: perfJson.domContentTime,
-                        dom_complete: perfJson.domCompleteTime
+                        total: perfJson.totalDurTime ? perfJson.totalDurTime : -1,
+                        dns: perfJson.dnsTime ? perfJson.dnsTime : -1,
+                        connect: perfJson.connectTime ? perfJson.connectTime : -1,
+                        ttfb: perfJson.ttfbTime ? perfJson.ttfbTime : -1,
+                        download: perfJson.downloadTime ? perfJson.downloadTime : -1,
+                        tlsHandshake: perfJson.tlsHandshake ? perfJson.tlsHandshake : -1,
+                        preTransfer: perfJson.preTransfer ? perfJson.preTransfer : -1,
+                        statusCodes: perfJson.statusCodesString ? perfJson.statusCodesString : '',
+                        dom_int: perfJson.domIntTime ? perfJson.domIntTime : -1,
+                        dom_content: perfJson.domContentTime ? perfJson.domContentTime : -1,
+                        dom_complete: perfJson.domCompleteTime ? perfJson.domCompleteTime : -1
                     }
                 }
             ]).catch(errorObj => {

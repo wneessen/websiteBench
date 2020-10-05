@@ -14,6 +14,8 @@ interface IWebsiteBenchConfig {
     logResErrors?: boolean,
     maxConcurrentJobs?: number,
     versionNum?: string,
+    instanceName?: string,
+    ignoreSslErrors?: boolean,
     logLevel?: 'silly'|'trace'|'debug'|'info'|'warn'|'error'|'fatal',
 }
 
@@ -25,7 +27,8 @@ interface IWebsiteBenchConfig {
 interface IWebsiteEntry {
     siteName: string,
     siteUrl: string,
-    checkInterval: number
+    checkInterval: number,
+    checkType?: "curl"|"browser"
 }
 
 /**
@@ -64,10 +67,16 @@ interface IPerformanceData {
     dnsTime: number,
     connectTime: number,
     ttfbTime: number,
-    downloadTime: number,
-    domIntTime: number,
-    domContentTime: number,
-    domCompleteTime: number
+    downloadTime?: number,
+    domIntTime?: number,
+    domContentTime?: number,
+    domCompleteTime?: number,
+    tlsHandshake?: number,
+    preTransfer?: number,
+    statusCode?: number,
+    statusCodes?: Array<number>,
+    statusCodesString?: string,
+    runNumber?: number
 }
 
 /**

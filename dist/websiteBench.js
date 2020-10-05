@@ -36,8 +36,8 @@ process_1.default.on('SIGINT', () => {
     process_1.default.exit(1);
 });
 const confFiles = {
-    configFile: './conf/websitebench.conf',
-    secretsFile: './conf/websitebench.secrets.conf'
+    configFile: './config/websitebench.conf',
+    secretsFile: './config/websitebench.secrets.conf'
 };
 const pupLaunchOptions = {
     headless: true,
@@ -75,7 +75,6 @@ try {
 }
 catch (errorObj) {
     logObj.error(`Error: ${errorObj.message}`);
-    showHelp();
     process_1.exit(1);
 }
 if (typeof cliArgs["--config"] !== 'undefined') {
@@ -84,10 +83,6 @@ if (typeof cliArgs["--config"] !== 'undefined') {
 ;
 if (typeof cliArgs["--secrets"] !== 'undefined') {
     confFiles.secretsFile = cliArgs["--secrets"];
-}
-;
-if (typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') {
-    pupLaunchOptions.ignoreHTTPSErrors = true;
 }
 ;
 if (typeof cliArgs["--no-headless"] !== 'undefined') {
@@ -118,13 +113,19 @@ if (typeof cliArgs["--log-resource-errors"] !== 'undefined') {
     configObj.logResErrors = cliArgs["--log-resource-errors"];
 }
 ;
+if (typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') {
+    pupLaunchOptions.ignoreHTTPSErrors = true;
+    configObj.ignoreSslErrors = true;
+}
+;
 if (typeof cliArgs["--help"] !== 'undefined') {
     showHelp();
     process_1.default.exit(0);
 }
 ;
 if (typeof cliArgs["--debug"] !== 'undefined') {
-    logObj.settings.minLevel = 'debug';
+    logObj.setSettings({ minLevel: 'debug' });
+    logObj.debug('DEBUG mode enabled');
 }
 ;
 const toolsObj = new websiteBenchTools_1.default();
@@ -182,12 +183,12 @@ function showHelp() {
     console.log('Usage: node websiteBench.js [arguments]');
     console.log('  -c, --config <filepath>\t\tUse <filepath> as config file (Default: ./conf/websitebench.conf)');
     console.log('  -s, --secrets <filepath>\t\tUse <filepath> as secrets file (Default: ./conf/websitebench.secrets.conf)');
+    console.log('  -d, --debug\t\t\t\tEnable DEBUG mode');
+    console.log('  -h, --help\t\t\t\tShow this help text');
     console.log('  --log-resource-errors\t\t\tIf set, the browser will start in non-headless mode');
     console.log('  --no-headless\t\t\t\tIf set, the browser will start in non-headless mode');
     console.log('  --no-sandbox\t\t\t\tIf set, the browser is started in no-sandbox mode (DANGER: Only use if you are sure what you are doing)');
     console.log('  --browserpath <path>\t\t\tPath to browser executable (Using Firefox requires --browsertype firefox)');
     console.log('  --browsertype <firefox|chrome>\tType of browser to use (Requires --browserpath to be set)');
-    console.log('  -d, --debug\t\t\t\tEnable DEBUG mode');
-    console.log('  -h, --help\t\t\t\tShow this help text');
 }
 startServer();

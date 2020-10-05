@@ -5,8 +5,9 @@ const process_1 = require("process");
 class WebsiteBenchConfig {
     constructor(confFiles, logObj) {
         this._configObj = {};
-        this._versionNum = '1.2.3';
+        this._versionNum = '1.3.2';
         this._allowCaching = false;
+        this._ignoreSslErrors = false;
         this._logResourceErrors = false;
         this._maxConcurrentJobs = 5;
         this._minCheckInterval = 30;
@@ -18,7 +19,8 @@ class WebsiteBenchConfig {
             allowCaching: this._allowCaching,
             maxConcurrentJobs: this._maxConcurrentJobs,
             logResErrors: this._logResourceErrors,
-            versionNum: this._versionNum,
+            ignoreSslErrors: this._ignoreSslErrors,
+            versionNum: this._versionNum
         }, confFileData);
         this._configObj.influxDb = { ...this._configObj.influxDb, ...secretFileData.influxDb };
         try {
@@ -46,7 +48,7 @@ class WebsiteBenchConfig {
         return this._configObj;
     }
     checkMandatory() {
-        const mandatoryProps = ['maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb'];
+        const mandatoryProps = ['maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb', 'instanceName'];
         const mandatoryInflux = ['hostname', 'database', 'username', 'password'];
         let missingProps = null;
         for (const objProp of mandatoryProps) {
@@ -87,6 +89,11 @@ class WebsiteBenchConfig {
                 configError.errorProperty = 'websiteList => siteUrl';
                 configError.errorMessage = 'Not all website list entries have a "siteUrl" property or the value is not a string';
             }
+            if ('checkType' in websiteEntry && typeof websiteEntry.checkType !== 'string') {
+                configError.hasError = true;
+                configError.errorProperty = 'websiteList => checkType';
+                configError.errorMessage = 'Value of "checkType" is not a string';
+            }
             if (!('checkInterval' in websiteEntry) || typeof websiteEntry.checkInterval !== 'number') {
                 configError.hasError = true;
                 configError.errorProperty = 'websiteList => checkInterval';
@@ -106,6 +113,11 @@ class WebsiteBenchConfig {
                 configError.hasError = true;
                 configError.errorProperty = 'siteUrl';
                 configError.errorMessage = `"siteUrl" of website entry "${websiteEntry.siteName}" cannot be empty`;
+            }
+            if ('checkType' in websiteEntry && (websiteEntry.checkType.toLowerCase() !== 'browser' && websiteEntry.checkType.toLowerCase() !== 'curl')) {
+                configError.hasError = true;
+                configError.errorProperty = 'checkType';
+                configError.errorMessage = `"checkType" of website entry "${websiteEntry.siteName}" has to be either "browser" or "curl"`;
             }
             try {
                 new URL(websiteEntry.siteUrl);

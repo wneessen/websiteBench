@@ -1,7 +1,9 @@
 import Puppeteer from 'puppeteer';
+import { Curl, CurlInfo, CurlInfoName, CurlProgressFunc } from 'node-libcurl';
 import WebsiteBenchTools from './websiteBenchTools';
 import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry } from './websiteBenchInterfaces';
 import { Logger } from 'tslog';
+import * as qObj from 'q'
 
 export default class WebsiteBenchBrowser {
     private browserObj: Puppeteer.Browser;
@@ -29,7 +31,7 @@ export default class WebsiteBenchBrowser {
      * @returns {Promise<void>}
      * @memberof WebsiteBenchBrowser
     */
-    public async processPage(websiteEntry: IWebsiteEntry): Promise<IPerformanceData> {
+    public async processPageWithBrowser(websiteEntry: IWebsiteEntry): Promise<IPerformanceData> {
         const webUrl = websiteEntry.siteUrl;
         const reqTimeout = websiteEntry.checkInterval - 1;
         let perfData: IPerformanceData = null;
@@ -43,7 +45,6 @@ export default class WebsiteBenchBrowser {
             domContentTime: 0,
             domCompleteTime: 0,
         };
-
 
         // Initialize Webbrowser page object (Incognito or not)
         this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
@@ -121,6 +122,102 @@ export default class WebsiteBenchBrowser {
         // Finalize response data
         return perfData;
     }
+
+    /**
+     * Perform the web request and process the page
+     *
+     * @returns {Promise<void>}
+     * @memberof WebsiteBenchBrowser
+    */
+    public async processPageWithCurl(websiteEntry: IWebsiteEntry): Promise<IPerformanceData> {
+        return new Promise((retFunc, rejFunc) => {
+            const webUrl = websiteEntry.siteUrl;
+            const reqTimeout = websiteEntry.checkInterval - 1;
+            const promiseArray: Array<qObj.Promise<IPerformanceData>> = [];
+            
+            let userAgent;
+            let perfData: IPerformanceData = null;
+            const perfDataTotal: IPerformanceData = {
+                totalDurTime: 0,
+                connectTime: 0,
+                dnsTime: 0,
+                ttfbTime: 0,
+                preTransfer: 0,
+                tlsHandshake: 0,
+                statusCode: 0,
+                statusCodes: []
+            };
+            
+            // Set User-Agent
+            if(this.configObj.userAgent) {
+                userAgent = this.configObj.userAgent;
+            }
+            else {
+                let browserUserAgent = Curl.defaultUserAgent;
+                userAgent = `${browserUserAgent} websiteBench/${this.configObj.versionNum}`;
+            }
+            
+            // Open the website for number of retries
+            for(let runCount = 0; runCount < this.numOfRetries; runCount++) {
+                this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`)
+                const deferObj = qObj.defer();
+                const curlObj = new Curl();
+                curlObj.setOpt('URL', webUrl);
+                curlObj.setOpt('TIMEOUT', reqTimeout);
+                curlObj.setOpt('USERAGENT', userAgent);
+                curlObj.setOpt('DNS_SHUFFLE_ADDRESSES', true);
+                curlObj.setOpt('SSL_VERIFYHOST', this.configObj.ignoreSslErrors === true ? false : true);
+                
+                curlObj.on('end', (statusCode, resData, resHeader, curlInstance) => {
+                    const tempPerf: IPerformanceData = {
+                        runNumber: runCount,
+                        totalDurTime: curlInstance.getInfo('TOTAL_TIME_T') as number / 1000,
+                        dnsTime: curlInstance.getInfo('NAMELOOKUP_TIME_T') as number / 1000,
+                        tlsHandshake: curlInstance.getInfo('APPCONNECT_TIME_T') as number / 1000,
+                        ttfbTime: curlInstance.getInfo('STARTTRANSFER_TIME_T') as number / 1000,
+                        preTransfer: curlInstance.getInfo('PRETRANSFER_TIME_T') as number / 1000,
+                        connectTime: curlInstance.getInfo('CONNECT_TIME_T') as number / 1000,
+                        statusCode: statusCode
+                    }
+                    deferObj.resolve(tempPerf);
+                    curlInstance.close();
+                });
+                curlObj.on('error', (errorObj) => {
+                    this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`)
+                    this.logObj.debug(`Completed performance data collection with error for ${webUrl} (Run: ${runCount})...`);
+                })
+                curlObj.perform();
+                promiseArray.push(deferObj.promise as qObj.Promise<IPerformanceData>);
+            }
+            
+            // Resolve the promises
+            qObj.all(promiseArray).then(resPromise => {
+                resPromise.forEach(curlPromise => {
+                    perfDataTotal.totalDurTime += curlPromise.totalDurTime;
+                    perfDataTotal.connectTime += curlPromise.connectTime;
+                    perfDataTotal.dnsTime += curlPromise.dnsTime;
+                    perfDataTotal.ttfbTime += curlPromise.ttfbTime;
+                    perfDataTotal.tlsHandshake += curlPromise.tlsHandshake;
+                    perfDataTotal.preTransfer += curlPromise.preTransfer;
+                    perfDataTotal.statusCodes.push(curlPromise.statusCode);
+                    this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${curlPromise.runNumber})...`);
+                })
+            }).finally(() => {
+                perfData = {
+                    totalDurTime: (perfDataTotal.totalDurTime / this.numOfRetries),
+                    connectTime: (perfDataTotal.connectTime / this.numOfRetries),
+                    dnsTime: (perfDataTotal.dnsTime / this.numOfRetries),
+                    ttfbTime: (perfDataTotal.ttfbTime / this.numOfRetries),
+                    tlsHandshake: (perfDataTotal.tlsHandshake / this.numOfRetries),
+                    preTransfer: (perfDataTotal.preTransfer / this.numOfRetries),
+                };
+                perfData.statusCodesString = perfDataTotal.statusCodes.join(':');
+                
+                // Finalize response data
+                retFunc(perfData);
+            });
+        })
+    }
     
     /**
      * Eventhandler for when an event in the website fired
@@ -151,7 +248,7 @@ export default class WebsiteBenchBrowser {
             }
         }
     }
-
+    
     /**
      * Process the performance data into usable format
      *
