@@ -29,7 +29,7 @@ class WebsiteBenchEvents extends events_1.EventEmitter {
             this.logObj.warn(`${websiteObj.siteUrl} already scheduled. Not scheduling a second time.`);
             return;
         }
-        this.logObj.debug(`Adding EventListener for Site "${websiteObj.siteName}`);
+        this.logObj.debug(`Adding EventListener for Site "${websiteObj.siteName}"`);
         this.addListener(websiteObj.siteName, () => {
             setImmediate(() => {
                 this.checkSite(websiteObj);
@@ -47,15 +47,22 @@ class WebsiteBenchEvents extends events_1.EventEmitter {
         const randDelay = (5000 + this._toolsObj.getRandNum(10000));
         const shortDelay = (2000 + this._toolsObj.getRandNum(5000));
         if (this._currentlyRunning >= this._configObj.maxConcurrentJobs) {
-            this.logObj.debug(`Maximum of concurrent jobs is reached. Rescheduling job by ${(randDelay / 1000).toFixed(3)} seconds...`);
+            this.logObj.warn(`Maximum amount of concurrent jobs is reached. Delaying job by ${(randDelay / 1000).toFixed(3)} seconds...`);
             return setTimeout(() => {
                 this.emit(websiteEntry.siteName);
             }, randDelay);
         }
         this._currentlyRunning++;
         setTimeout(async () => {
-            this.logObj.debug(`Executing perfomance check for site: ${websiteEntry.siteName}`);
-            let perfJson = await this._browserObj.processPage(websiteEntry);
+            let perfJson;
+            let checkType = ('checkType' in websiteEntry && websiteEntry.checkType === 'curl') ? 'cURL' : 'Browser';
+            this.logObj.debug(`Executing perfomance check for site: ${websiteEntry.siteName} (via ${checkType})`);
+            if (checkType === 'cURL') {
+                perfJson = await this._browserObj.processPageWithCurl(websiteEntry);
+            }
+            else {
+                perfJson = await this._browserObj.processPageWithBrowser(websiteEntry);
+            }
             this._currentlyRunning--;
             this.sendDataToInflux(websiteEntry, perfJson);
         }, shortDelay);
@@ -69,14 +76,17 @@ class WebsiteBenchEvents extends events_1.EventEmitter {
                         website: websiteEntry.siteName
                     },
                     fields: {
-                        total: perfJson.totalDurTime,
-                        dns: perfJson.dnsTime,
-                        connect: perfJson.connectTime,
-                        ttfb: perfJson.ttfbTime,
-                        download: perfJson.downloadTime,
-                        dom_int: perfJson.domIntTime,
-                        dom_content: perfJson.domContentTime,
-                        dom_complete: perfJson.domCompleteTime
+                        total: perfJson.totalDurTime ? perfJson.totalDurTime : 0,
+                        dns: perfJson.dnsTime ? perfJson.dnsTime : 0,
+                        connect: perfJson.connectTime ? perfJson.connectTime : 0,
+                        ttfb: perfJson.ttfbTime ? perfJson.ttfbTime : 0,
+                        download: perfJson.downloadTime ? perfJson.downloadTime : 0,
+                        tlsHandshake: perfJson.tlsHandshake ? perfJson.tlsHandshake : 0,
+                        preTransfer: perfJson.preTransfer ? perfJson.preTransfer : 0,
+                        statusCodes: perfJson.statusCodesString ? perfJson.statusCodesString : '',
+                        dom_int: perfJson.domIntTime ? perfJson.domIntTime : 0,
+                        dom_content: perfJson.domContentTime ? perfJson.domContentTime : 0,
+                        dom_complete: perfJson.domCompleteTime ? perfJson.domCompleteTime : 0
                     }
                 }
             ]).catch(errorObj => {

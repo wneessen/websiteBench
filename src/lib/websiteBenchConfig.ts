@@ -8,7 +8,7 @@ export default class WebsiteBenchConfig {
     private _configObj: IWebsiteBenchConfig = {};
 
     // Defaults config settings
-    private _versionNum = '1.2.3';
+    private _versionNum = '1.3.0-dev';
     private _allowCaching = false;
     private _logResourceErrors = false;
     private _maxConcurrentJobs = 5;
@@ -33,7 +33,7 @@ export default class WebsiteBenchConfig {
             allowCaching: this._allowCaching,
             maxConcurrentJobs: this._maxConcurrentJobs,
             logResErrors: this._logResourceErrors,
-            versionNum: this._versionNum,
+            versionNum: this._versionNum
         }, confFileData);
         this._configObj.influxDb = {...this._configObj.influxDb, ...secretFileData.influxDb};
 
@@ -131,6 +131,11 @@ export default class WebsiteBenchConfig {
                 configError.errorProperty = 'websiteList => siteUrl';
                 configError.errorMessage = 'Not all website list entries have a "siteUrl" property or the value is not a string';
             }
+            if('checkType' in websiteEntry && typeof websiteEntry.checkType !== 'string') {
+                configError.hasError = true;
+                configError.errorProperty = 'websiteList => checkType';
+                configError.errorMessage = 'Value of "checkType" is not a string';
+            }
             if(!('checkInterval' in websiteEntry) || typeof websiteEntry.checkInterval !== 'number') {
                 configError.hasError = true;
                 configError.errorProperty = 'websiteList => checkInterval';
@@ -150,6 +155,11 @@ export default class WebsiteBenchConfig {
                 configError.hasError = true;
                 configError.errorProperty = 'siteUrl';
                 configError.errorMessage = `"siteUrl" of website entry "${websiteEntry.siteName}" cannot be empty`
+            }
+            if('checkType' in websiteEntry && (websiteEntry.checkType.toLowerCase() !== 'browser' && websiteEntry.checkType.toLowerCase() !== 'curl')) {
+                configError.hasError = true;
+                configError.errorProperty = 'checkType';
+                configError.errorMessage = `"checkType" of website entry "${websiteEntry.siteName}" has to be either "browser" or "curl"`
             }
             try {
                 new URL(websiteEntry.siteUrl);

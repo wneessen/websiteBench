@@ -8,10 +8,10 @@ RUN         /usr/bin/groupadd -r websitebench && /usr/bin/useradd -r -g websiteb
 COPY        ["LICENSE", "README.md", "package.json", "package-lock.json", "/opt/websiteBench/"]
 COPY        ["dist", "/opt/websiteBench/dist"]
 COPY        ["log", "/opt/websiteBench/log"]
-COPY        ["conf", "/opt/websiteBench/conf"]
+COPY        ["config", "/opt/websiteBench/config"]
 RUN         chown -R websitebench:websitebench /opt/websiteBench
 WORKDIR     /opt/websiteBench
 USER        websitebench
 RUN         npm install
-VOLUME      ["/opt/websiteBench/conf", "/opt/websiteBench/log"]
+VOLUME      ["/opt/websiteBench/config", "/opt/websiteBench/log"]
 ENTRYPOINT  ["/usr/bin/node", "dist/websiteBench.js"]

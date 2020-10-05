@@ -8,8 +8,8 @@ lerna-debug.log*
 .vscode/*
 log/*
 !log/.gitkeep
-conf/*
-!conf/websitebench.conf
+config/*
+!config/websitebench.conf
 
 
 # Diagnostic reports (https://nodejs.org/api/report.html)

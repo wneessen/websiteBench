@@ -51,7 +51,7 @@ To run the Docker image simply issue the following command:
   ```
 - Run the docker image
   ```sh
-  $ docker run --security-opt seccomp=wb-seccomp.json -v /var/db/websiteBench/config/:/opt/websiteBench/conf/ -v /var/db/websiteBench/log/:/opt/websiteBench/log/ website-bench:prod -c conf/yourconfig.conf
+  $ docker run --security-opt seccomp=wb-seccomp.json -v /var/db/websiteBench/config/:/opt/websiteBench/config/ -v /var/db/websiteBench/log/:/opt/websiteBench/log/ website-bench:prod -c config/yourconfig.conf
   ```
   (You can add additional CLI parameters if needed)
 

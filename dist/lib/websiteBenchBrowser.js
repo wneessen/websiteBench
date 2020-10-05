@@ -1,9 +1,30 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const node_libcurl_1 = require("node-libcurl");
 const websiteBenchTools_1 = __importDefault(require("./websiteBenchTools"));
+const qObj = __importStar(require("q"));
 class WebsiteBenchBrowser {
     constructor(browserObj, configObj, logObj) {
         this.toolsObj = new websiteBenchTools_1.default();
@@ -13,7 +34,7 @@ class WebsiteBenchBrowser {
         this.configObj = configObj;
         this.logObj = logObj;
     }
-    async processPage(websiteEntry) {
+    async processPageWithBrowser(websiteEntry) {
         const webUrl = websiteEntry.siteUrl;
         const reqTimeout = websiteEntry.checkInterval - 1;
         let perfData = null;
@@ -86,6 +107,83 @@ class WebsiteBenchBrowser {
             domCompleteTime: (perfDataTotal.domCompleteTime / this.numOfRetries)
         };
         return perfData;
+    }
+    async processPageWithCurl(websiteEntry) {
+        return new Promise((retFunc, rejFunc) => {
+            const webUrl = websiteEntry.siteUrl;
+            const reqTimeout = websiteEntry.checkInterval - 1;
+            const promiseArray = [];
+            let userAgent;
+            let perfData = null;
+            const perfDataTotal = {
+                totalDurTime: 0,
+                connectTime: 0,
+                dnsTime: 0,
+                ttfbTime: 0,
+                preTransfer: 0,
+                tlsHandshake: 0,
+                statusCode: 0,
+                statusCodes: []
+            };
+            if (this.configObj.userAgent) {
+                userAgent = this.configObj.userAgent;
+            }
+            else {
+                let browserUserAgent = node_libcurl_1.Curl.defaultUserAgent;
+                userAgent = `${browserUserAgent} websiteBench/${this.configObj.versionNum}`;
+            }
+            for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
+                this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
+                const deferObj = qObj.defer();
+                const curlObj = new node_libcurl_1.Curl();
+                curlObj.setOpt(node_libcurl_1.Curl.option.URL, webUrl);
+                curlObj.setOpt(node_libcurl_1.Curl.option.TIMEOUT, reqTimeout);
+                curlObj.setOpt(node_libcurl_1.Curl.option.USERAGENT, userAgent);
+                curlObj.on('end', (statusCode, resData, resHeader, curlInstance) => {
+                    const tempPerf = {
+                        runNumber: runCount,
+                        totalDurTime: curlInstance.getInfo('TOTAL_TIME_T') / 1000,
+                        dnsTime: curlInstance.getInfo('NAMELOOKUP_TIME_T') / 1000,
+                        tlsHandshake: curlInstance.getInfo('APPCONNECT_TIME_T') / 1000,
+                        ttfbTime: curlInstance.getInfo('STARTTRANSFER_TIME_T') / 1000,
+                        preTransfer: curlInstance.getInfo('PRETRANSFER_TIME_T') / 1000,
+                        connectTime: curlInstance.getInfo('CONNECT_TIME_T') / 1000,
+                        statusCode: statusCode
+                    };
+                    deferObj.resolve(tempPerf);
+                    curlInstance.close();
+                });
+                curlObj.on('error', (errorObj) => {
+                    this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`);
+                    this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
+                });
+                curlObj.perform();
+                promiseArray.push(deferObj.promise);
+            }
+            qObj.all(promiseArray).then(resPromise => {
+                resPromise.forEach(curlPromise => {
+                    perfDataTotal.totalDurTime += curlPromise.totalDurTime;
+                    perfDataTotal.connectTime += curlPromise.connectTime;
+                    perfDataTotal.dnsTime += curlPromise.dnsTime;
+                    perfDataTotal.ttfbTime += curlPromise.ttfbTime;
+                    perfDataTotal.tlsHandshake += curlPromise.tlsHandshake;
+                    perfDataTotal.preTransfer += curlPromise.preTransfer;
+                    perfDataTotal.statusCodes.push(curlPromise.statusCode);
+                    this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${curlPromise.runNumber})...`);
+                });
+            }).finally(() => {
+                perfData = {
+                    totalDurTime: (perfDataTotal.totalDurTime / this.numOfRetries),
+                    connectTime: (perfDataTotal.connectTime / this.numOfRetries),
+                    dnsTime: (perfDataTotal.dnsTime / this.numOfRetries),
+                    ttfbTime: (perfDataTotal.ttfbTime / this.numOfRetries),
+                    tlsHandshake: (perfDataTotal.tlsHandshake / this.numOfRetries),
+                    preTransfer: (perfDataTotal.preTransfer / this.numOfRetries),
+                };
+                perfData.statusCodesString = perfDataTotal.statusCodes.join(':');
+                retFunc(perfData);
+            });
+        });
     }
     async eventTriggered(eventObj) {
         if (this.toolsObj.eventIsDialog(eventObj)) {
