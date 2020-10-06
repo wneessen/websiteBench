@@ -51,9 +51,10 @@ To run the Docker image simply issue the following command:
   ```sh
   $ curl -LO https://raw.githubusercontent.com/wneessen/websiteBench/master/wb-seccomp.json
   ```
+  (Due to the hardened kernel settings, this will not run on Arch Linux with the "Hardened" kernel. You will have to use **--no-sandbox** instead. // Only use when you really know what you are doing. Read more about the **--no-sandbox** Option [here](https://chromium.googlesource.com/chromium/src/+/master/docs/design/sandbox.md))
 - Run the docker image
   ```sh
-  $ docker run --security-opt seccomp=wb-seccomp.json -v /var/db/websiteBench/config/:/opt/websiteBench/config/ -v /var/db/websiteBench/log/:/opt/websiteBench/log/ website-bench:prod -c config/yourconfig.conf
+  $ docker run --security-opt seccomp=wb-seccomp.json -v /var/db/websiteBench/config:/opt/websiteBench/config -v /var/db/websiteBench/log:/opt/websiteBench/log wneessen/website-bench:prod -c config/yourconfig.conf
   ```
   (You can add additional CLI parameters if needed)
 
