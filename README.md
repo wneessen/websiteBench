@@ -1,13 +1,15 @@
 # websiteBench
-websiteBench will measure website performance and propagate the results into an InfluxDB database. As websiteBench is making use of Google's [Puppeteer Framework](https://pptr.dev/), the performance is meassured via a real browser (Chrome or Firefox).
+websiteBench will measure website performance and propagate the results into an InfluxDB database. websiteBench is making use of Google's [Puppeteer Framework](https://pptr.dev/) or alternatively the cURL library to measure the performance data points. Puppeteer has the advantage, that is using a "real" (headless) browser (Chrome or Firefox), so it can measure the performance as your browser on your desktop would.
 
 ## Requirements
 This service requires some NodeJS and some modules to work:
 - [Arg](https://www.npmjs.com/package/arg)
+- [@influxdata/influxdb-client](https://github.com/influxdata/influxdb-client-js/)
+- [@influxdata/influxdb-client-apis](https://github.com/influxdata/influxdb-client-js/)
 - [Node-Influx](https://node-influx.github.io/)
 - [NodeJS](https://nodejs.org/en/)
 - [node-libcurl](https://github.com/JCMais/node-libcurl/)
-- [Google Puppeteer](https://pptr.dev/)
+- [Puppeteer](https://pptr.dev/)
 - [Q](https://github.com/kriskowal/q)
 - [tslog](https://tslog.js.org/)
 
@@ -51,9 +53,10 @@ To run the Docker image simply issue the following command:
   ```sh
   $ curl -LO https://raw.githubusercontent.com/wneessen/websiteBench/master/wb-seccomp.json
   ```
+  (Due to the hardened kernel settings, this will not run on Arch Linux with the "Hardened" kernel. You will have to use **--no-sandbox** instead. // Only use when you really know what you are doing. Read more about the **--no-sandbox** Option [here](https://chromium.googlesource.com/chromium/src/+/master/docs/design/sandbox.md))
 - Run the docker image
   ```sh
-  $ docker run --security-opt seccomp=wb-seccomp.json -v /var/db/websiteBench/config/:/opt/websiteBench/config/ -v /var/db/websiteBench/log/:/opt/websiteBench/log/ website-bench:prod -c config/yourconfig.conf
+  $ docker run --security-opt seccomp=wb-seccomp.json -v /var/db/websiteBench/config:/opt/websiteBench/config -v /var/db/websiteBench/log:/opt/websiteBench/log wneessen/website-bench:prod -c config/yourconfig.conf
   ```
   (You can add additional CLI parameters if needed)
 
@@ -80,7 +83,10 @@ The config accepts the following options:
         "protocol": "https",
         "port": 443,
         "database": "websitebench",
-        "ignoressl": false
+        "ignoressl": false,
+        "authmethod": "userpass",
+        "username": "ttester",
+        "password": "VerySecurePassw0rd!"
     },
     "allowCaching": false,
 	  "logLevel": "info",
@@ -107,9 +113,12 @@ The config accepts the following options:
 - ```IInfluxDbConfig (Object)```: Consists of the following settings:
   -  ```hostname (String)```: Hostname or IP of the InfluxDB server
   -  ```database (String)```: InfluxDB database name to store the metrics in
+  -  ```authmethod (String)```: Can be either "userpass" for username/password authentication or "token" for Token-based authentication. (InfluxDb v2 requires "token")
   -  ```username (String)```: Username for InfluxDB authentication
   -  ```password (String)```: Password for InfluxDB authentication
   -  ```protocol (String)```: "http" or "https" (Default: http)
+  -  ```token (String)```: The authentication token (InfluxDB v2)
+  -  ```organization (String)```: The authentication organization (InfluxDB v2)
   -  ```port (Number)```: Port of InfluxDB server (Default: 8086)
   -  ```path (String)``` (Optional): Path of the InfluxDB server
 
@@ -117,7 +126,7 @@ The config accepts the following options:
 The server provides the following CLI parameters to override defaults
 
 - ```-c, --config <filepath> ```: Path to config file
-- ```-s, --secrets <filepath> ```: Path to secrets config file
+- ```-s, --secrets <filepath> ```: Path to secrets config file (this is helpful in case you want to seperate username/password/token from the normal config)
 - ```-d, --debug```: Enable DEBUG mode (more logging)
 - ```--no-headless```: If set, the browser will start in non-headless mode
 - ```--no-sandbox```: If set, the browser is started in no-sandbox mode (**DANGEROUS**: Only use if you are sure what you are doing)

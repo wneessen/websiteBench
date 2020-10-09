@@ -25,6 +25,10 @@ interface IInfluxDbConfig {
     ignoressl?: boolean;
     username?: string;
     password?: string;
+    token?: string;
+    version?: number;
+    organization?: string;
+    authmethod?: "token" | "userpass";
 }
 interface IUserCredentials {
     username: string;

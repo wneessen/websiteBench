@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -26,11 +26,11 @@ const node_libcurl_1 = require("node-libcurl");
 const websiteBenchTools_1 = __importDefault(require("./websiteBenchTools"));
 const qObj = __importStar(require("q"));
 class WebsiteBenchBrowser {
-    constructor(browserObj, configObj, logObj) {
+    constructor(configObj, logObj, browserObj) {
         this.toolsObj = new websiteBenchTools_1.default();
         this.logObj = null;
         this.numOfRetries = 3;
-        this.browserObj = browserObj;
+        this.browserObj = browserObj ? browserObj : null;
         this.configObj = configObj;
         this.logObj = logObj;
     }
@@ -52,13 +52,13 @@ class WebsiteBenchBrowser {
         const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
         if (this.configObj.userAgent) {
             await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
-                this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+                this.logObj.error(`[Browser] Unable to set User-Agent string: ${errorMsg}`);
             });
         }
         else {
             let browserUserAgent = await this.browserObj.userAgent();
             await pageObj.setUserAgent(`${browserUserAgent} websiteBench/${this.configObj.versionNum}`).catch(errorMsg => {
-                this.logObj.error(`Unable to set User-Agent string: ${errorMsg}`);
+                this.logObj.error(`[Browser] Unable to set User-Agent string: ${errorMsg}`);
             });
         }
         pageObj.setDefaultTimeout(reqTimeout * 1000);
@@ -66,21 +66,21 @@ class WebsiteBenchBrowser {
         pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
         pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
         for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-            this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
+            this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
-                this.logObj.error(`An error occured during "Page Goto" => ${errorMsg}`);
+                this.logObj.error(`[Browser] An error occured during "Page Goto" => ${errorMsg}`);
             });
             if (!httpResponse)
                 return;
             const perfElementHandler = await pageObj.$('pageData').catch(errorMsg => {
-                this.logObj.error(`An error occured during "Performance Element Handling" => ${errorMsg}`);
+                this.logObj.error(`[Browser] An error occured during "Performance Element Handling" => ${errorMsg}`);
             });
             if (typeof perfElementHandler !== 'object')
                 return;
             const perfJson = await pageObj.evaluate(pageData => {
                 return JSON.stringify(performance.getEntriesByType('navigation'));
             }, perfElementHandler).catch(errorMsg => {
-                this.logObj.error(`An error occured "Page evaluation" => ${errorMsg}`);
+                this.logObj.error(`[Browser] An error occured "Page evaluation" => ${errorMsg}`);
             });
             if (perfJson) {
                 let tempPerf = this.processPerformanceData(perfJson);
@@ -93,7 +93,7 @@ class WebsiteBenchBrowser {
                 perfDataTotal.domContentTime += tempPerf.domContentTime;
                 perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
             }
-            this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
+            this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
         }
         pageObj.close();
         perfData = {
@@ -133,7 +133,7 @@ class WebsiteBenchBrowser {
                 userAgent = `${browserUserAgent} websiteBench/${this.configObj.versionNum}`;
             }
             for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-                this.logObj.debug(`Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
+                this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
                 const deferObj = qObj.defer();
                 const curlObj = new node_libcurl_1.Curl();
                 curlObj.setOpt('URL', webUrl);
@@ -157,7 +157,7 @@ class WebsiteBenchBrowser {
                 });
                 curlObj.on('error', (errorObj) => {
                     this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`);
-                    this.logObj.debug(`Completed performance data collection with error for ${webUrl} (Run: ${runCount})...`);
+                    this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl} (Run: ${runCount})...`);
                 });
                 curlObj.perform();
                 promiseArray.push(deferObj.promise);
@@ -171,7 +171,7 @@ class WebsiteBenchBrowser {
                     perfDataTotal.tlsHandshake += curlPromise.tlsHandshake;
                     perfDataTotal.preTransfer += curlPromise.preTransfer;
                     perfDataTotal.statusCodes.push(curlPromise.statusCode);
-                    this.logObj.debug(`Completed performance data collection for ${webUrl} (Run: ${curlPromise.runNumber})...`);
+                    this.logObj.debug(`[cURL] Completed performance data collection for ${webUrl} (Run: ${curlPromise.runNumber})...`);
                 });
             }).finally(() => {
                 perfData = {
