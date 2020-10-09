@@ -8,12 +8,14 @@ export default class WebsiteBenchConfig {
     private _configObj: IWebsiteBenchConfig = {};
 
     // Defaults config settings
-    private _versionNum = '1.3.3-dev';
+    private _versionNum = '1.4.0';
     private _allowCaching = false;
     private _ignoreSslErrors = false;
     private _logResourceErrors = false;
     private _maxConcurrentJobs = 5;
     private _minCheckInterval = 30;
+    private _influxVersion = 1.7;
+    private _influxDefaultAuth: "userpass"|"token" = 'userpass';
     private logObj: Logger = null;
     
     /**
@@ -37,7 +39,11 @@ export default class WebsiteBenchConfig {
             ignoreSslErrors: this._ignoreSslErrors,
             versionNum: this._versionNum
         }, confFileData);
-        this._configObj.influxDb = {...this._configObj.influxDb, ...secretFileData.influxDb};
+        this._configObj.influxDb = {
+            ...{version: this._influxVersion, authmethod: this._influxDefaultAuth},
+            ...this._configObj.influxDb,
+            ...secretFileData.influxDb
+        };
 
         // Check the that all mandatory config props are present
         try {
@@ -85,7 +91,7 @@ export default class WebsiteBenchConfig {
     private checkMandatory(): void {
         // Make sure all mandatory
         const mandatoryProps = ['maxConcurrentJobs', 'allowCaching', 'websiteList', 'influxDb', 'instanceName'];
-        const mandatoryInflux = ['hostname', 'database', 'username', 'password'];
+        const mandatoryInflux = ['hostname', 'database', 'authmethod', 'version'];
         let missingProps: string = null;
         for(const objProp of mandatoryProps) {
             if(!(objProp in this._configObj)) {
@@ -121,6 +127,50 @@ export default class WebsiteBenchConfig {
             configError.hasError = true;
             configError.errorProperty = 'allowCaching';
             configError.errorMessage = 'Needs to be a boolean value'
+        }
+        if(!('version' in this._configObj.influxDb) || typeof this._configObj.influxDb.version !== 'number') {
+            configError.hasError = true;
+            configError.errorProperty = 'influxDb => version';
+            configError.errorMessage = 'InluxDb configuration setting "version" is not a number.';
+        }
+        if(!('authmethod' in this._configObj.influxDb) || typeof this._configObj.influxDb.authmethod !== 'string') {
+            configError.hasError = true;
+            configError.errorProperty = 'influxDb => authmethod';
+            configError.errorMessage = 'InluxDb configuration setting "authmethod" is not a string.';
+        }
+        if('authmethod' in this._configObj.influxDb && (this._configObj.influxDb.authmethod.toLowerCase() !== 'token' && this._configObj.influxDb.authmethod.toLowerCase() !== 'userpass')) {
+            configError.hasError = true;
+            configError.errorProperty = 'influxDb => authmethod';
+            configError.errorMessage = `InluxDb configuration setting "authmethod" needs to be either "userpass" or "token": ${this._configObj.influxDb.authmethod}`;
+        }
+        if('authmethod' in this._configObj.influxDb && this._configObj.influxDb.authmethod.toLowerCase() === 'token') {
+            if(!('token' in this._configObj.influxDb) || this._configObj.influxDb.token === '' || this._configObj.influxDb.token === null) {
+                configError.hasError = true;
+                configError.errorProperty = 'influxDb => token';
+                configError.errorMessage = `InluxDb configuration setting "token" value cannot be empty in token-auth mode`;
+            }
+            if(!('organization' in this._configObj.influxDb) || this._configObj.influxDb.organization === '' || this._configObj.influxDb.organization === null) {
+                configError.hasError = true;
+                configError.errorProperty = 'influxDb => organization';
+                configError.errorMessage = `InluxDb configuration setting "organization" value cannot be empty in token-auth mode`;
+            }
+        }
+        else {
+            if(!('username' in this._configObj.influxDb) || this._configObj.influxDb.username === '' || this._configObj.influxDb.username === null) {
+                configError.hasError = true;
+                configError.errorProperty = 'influxDb => username';
+                configError.errorMessage = `InluxDb configuration setting "username" value cannot be empty in userpass-auth mode`;
+            }
+            if(!('password' in this._configObj.influxDb) || this._configObj.influxDb.password === '' || this._configObj.influxDb.password === null) {
+                configError.hasError = true;
+                configError.errorProperty = 'influxDb => password';
+                configError.errorMessage = `InluxDb configuration setting "password" value cannot be empty in userpass-auth mode`;
+            }
+        }
+        if('authmethod' in this._configObj.influxDb && this._configObj.influxDb.authmethod === 'token' && this._configObj.influxDb.version < 2) {
+            configError.hasError = true;
+            configError.errorProperty = 'influxDb => authmethod/version';
+            configError.errorMessage = `InluxDb version below 2.0 does not support token authentication. Please switch to userpass-auth mode`;
         }
         this._configObj.websiteList.forEach(websiteEntry => {
             if(!('siteName' in websiteEntry) || typeof websiteEntry.siteName !== 'string') {
@@ -204,5 +254,25 @@ export default class WebsiteBenchConfig {
         }
 
         return configJson;
+    }
+    
+    /**
+     * Do we need a browser?
+     *
+     * @returns {boolean}
+     * @memberof WebsiteBenchConfig
+    */
+    public isBrowserNeeded(): boolean {
+        let browserCount = 0;
+        this._configObj.websiteList.forEach(siteEntry => {
+            if(typeof siteEntry.checkType === 'undefined' || siteEntry.checkType === null) {
+                browserCount++;
+            }
+            else if('checkType' in siteEntry && siteEntry.checkType.toLowerCase() === 'browser') {
+                browserCount++;
+            }
+        });
+
+        return browserCount > 0;
     }
 }

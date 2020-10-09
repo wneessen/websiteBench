@@ -8,12 +8,8 @@ const events_1 = require("events");
 class WebsiteBenchEvents extends events_1.EventEmitter {
     constructor(configObj, influxDbClient, logObj) {
         super();
-        this._configObj = null;
-        this._influxDbClient = null;
-        this._browserObj = null;
         this._toolsObj = new websiteBenchTools_1.default();
         this._currentlyRunning = 0;
-        this.logObj = null;
         this._configObj = configObj;
         this._influxDbClient = influxDbClient;
         this.logObj = logObj;
@@ -69,7 +65,7 @@ class WebsiteBenchEvents extends events_1.EventEmitter {
     }
     async sendDataToInflux(websiteEntry, perfJson) {
         if (perfJson) {
-            this._influxDbClient.writePoints([
+            await this._influxDbClient.writePoints([
                 {
                     measurement: 'benchmark',
                     tags: {

@@ -8,7 +8,7 @@ export default class WebsiteBenchBrowser {
     private toolsObj;
     private logObj;
     private numOfRetries;
-    constructor(browserObj: Puppeteer.Browser, configObj: IWebsiteBenchConfig, logObj: Logger);
+    constructor(configObj: IWebsiteBenchConfig, logObj: Logger, browserObj?: Puppeteer.Browser);
     processPageWithBrowser(websiteEntry: IWebsiteEntry): Promise<IPerformanceData>;
     processPageWithCurl(websiteEntry: IWebsiteEntry): Promise<IPerformanceData>;
     private eventTriggered;

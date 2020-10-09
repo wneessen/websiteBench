@@ -44,7 +44,11 @@ interface IInfluxDbConfig {
     protocol?: 'http'|'https',
     ignoressl?: boolean,
     username?: string,
-    password?: string
+    password?: string,
+    token?: string,
+    version?: number,
+    organization?: string,
+    authmethod?: "token"|"userpass"
 }
 
 /**
@@ -99,7 +103,6 @@ interface IConfigFiles {
     configFile: string,
     secretsFile: string
 }
-
 
 // Exports
 export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles }

@@ -4,14 +4,15 @@ import { IPerformanceData, IWebsiteBenchConfig, IWebsiteEntry } from './websiteB
 import { EventEmitter } from 'events';
 import { InfluxDB } from 'influx';
 import { Logger } from 'tslog';
+import WebsiteBenchInflux from './websiteBenchInflux';
 
 export default class WebsiteBenchEvents extends EventEmitter {
-    private _configObj: IWebsiteBenchConfig = null;
-    private _influxDbClient: InfluxDB = null;
-    private _browserObj: WebsiteBenchBrowser = null;
+    private _configObj: IWebsiteBenchConfig;
+    private _influxDbClient: WebsiteBenchInflux;
+    private _browserObj: WebsiteBenchBrowser;
     private _toolsObj = new WebsiteBenchTools();
     private _currentlyRunning: number = 0;
-    private logObj: Logger = null;
+    private logObj: Logger;
 
     /**
      * Constructor
@@ -20,7 +21,7 @@ export default class WebsiteBenchEvents extends EventEmitter {
      * @extends EventEmitter
      * @memberof WebsiteBenchEvents
     */
-    constructor(configObj: IWebsiteBenchConfig, influxDbClient: InfluxDB, logObj: Logger) {
+    constructor(configObj: IWebsiteBenchConfig, influxDbClient: WebsiteBenchInflux, logObj: Logger) {
         super();
         this._configObj = configObj;
         this._influxDbClient = influxDbClient;
@@ -128,7 +129,7 @@ export default class WebsiteBenchEvents extends EventEmitter {
     */
     private async sendDataToInflux(websiteEntry: IWebsiteEntry, perfJson: IPerformanceData) {
         if(perfJson) {
-            this._influxDbClient.writePoints([
+            await this._influxDbClient.writePoints([
                 {
                     measurement: 'benchmark',
                     tags: {

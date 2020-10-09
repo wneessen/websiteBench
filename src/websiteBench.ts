@@ -1,6 +1,7 @@
 // websiteBench - Benchmark website performance measures via Puppeteer and InfluxDB
 // (C) 2020 by Winni Neessen <wn@neessen.net>
 import WebsiteBenchBrowser from './lib/websiteBenchBrowser';
+import websiteBenchInflux from './lib/websiteBenchInflux';
 import WebsiteBenchConfig from './lib/websiteBenchConfig';
 import WebsiteBenchEvents from './lib/websiteBenchEvents';
 import WebsiteBenchTools from './lib/websiteBenchTools';
@@ -8,7 +9,6 @@ import { IConfigFiles, IWebsiteBenchConfig } from './lib/websiteBenchInterfaces'
 import Puppeteer from 'puppeteer';
 import { Curl } from 'node-libcurl';
 import arg from 'arg';
-import { InfluxDB } from 'influx';
 import { ILogObject, Logger } from 'tslog';
 import process, { exit } from 'process';
 
@@ -90,7 +90,8 @@ if(
 };
 
 // Read config files to create config object
-const configObj = new WebsiteBenchConfig(confFiles, logObj).configObj();
+const _configObj = new WebsiteBenchConfig(confFiles, logObj);
+const configObj = _configObj.configObj();
 if(typeof cliArgs["--log-resource-errors"] !== 'undefined') { configObj.logResErrors = cliArgs["--log-resource-errors"] };
 if(typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') { pupLaunchOptions.ignoreHTTPSErrors = true; configObj.ignoreSslErrors = true };
 
@@ -114,36 +115,10 @@ logObj.attachTransport(
 );
 
 // Initialize InfluxDB object
-const influxClient = new InfluxDB({
-    database: configObj.influxDb.database,
-    username: configObj.influxDb.username,
-    password: configObj.influxDb.password,
-    hosts: [
-        {
-            host: configObj.influxDb.hostname,
-            port: (configObj.influxDb.port !== null ? configObj.influxDb.port : 8086),
-            path: (configObj.influxDb.path !== null ? configObj.influxDb.path : '/'),
-            protocol: (configObj.influxDb.protocol !== null ? configObj.influxDb.protocol : 'http'),
-            options: {
-                rejectUnauthorized: (configObj.influxDb.ignoressl === true ? false : true)
-            }
-        }
-    ]
-});
-influxClient.getDatabaseNames().then(dbNames => {
-    if(dbNames.indexOf(configObj.influxDb.database) === -1) {
-        logObj.error(`Database "${configObj.influxDb.database}" not found on InfluxDB server.`);
-        exit(1);
-    }
-}).catch(errorMsg => {
-    logObj.error(`Unable to connect to InfluxDB:`);
-    logObj.error(errorMsg.message);
-    logObj.error(`Please check your influxDb config settings`);
-    exit(1);
-});
+const influxObj = new websiteBenchInflux(configObj, logObj);
 
 // Initialize Event object
-const eventObj = new WebsiteBenchEvents(configObj, influxClient, logObj);
+const eventObj = new WebsiteBenchEvents(configObj, influxObj, logObj);
 
 /**
  * The main server loop
@@ -153,11 +128,23 @@ const eventObj = new WebsiteBenchEvents(configObj, influxClient, logObj);
 */
 async function startServer(): Promise<void> {
     logObj.info(`websiteBench v${configObj.versionNum} - Starting Server`)
-    const browserObj = await Puppeteer.launch(pupLaunchOptions).catch(errorMsg => {
-        logObj.error(`Unable to start Browser: ${errorMsg}`);
-        process.exit(1);
+
+    // Check that we have a working Influx connection
+    await influxObj.checkConnection().catch(errorObj => {
+        logObj.error(`Connection test to InfluxDB failed: ${errorObj.message}`);
+        exit(1);
     });
-    const websiteBrowser = new WebsiteBenchBrowser(browserObj, configObj, logObj);
+    
+    // Open the browser
+    let browserObj: Puppeteer.Browser = null;
+    if(_configObj.isBrowserNeeded()) {
+        browserObj = await Puppeteer.launch(pupLaunchOptions).catch(errorMsg => {
+            logObj.error(`Unable to start Browser: ${errorMsg}`);
+            process.exit(1);
+        });
+
+    }
+    const websiteBrowser = new WebsiteBenchBrowser(configObj, logObj, browserObj);
     eventObj.browserObj = websiteBrowser;
     
     configObj.websiteList.forEach(webSite => {

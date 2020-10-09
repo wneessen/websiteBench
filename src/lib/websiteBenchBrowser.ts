@@ -19,8 +19,8 @@ export default class WebsiteBenchBrowser {
      * @constructor
      * @memberof WebsiteBenchBrowser
     */
-    constructor(browserObj: Puppeteer.Browser, configObj: IWebsiteBenchConfig, logObj: Logger) {
-        this.browserObj = browserObj;
+    constructor(configObj: IWebsiteBenchConfig, logObj: Logger, browserObj?: Puppeteer.Browser) {
+        this.browserObj = browserObj ? browserObj : null;
         this.configObj  = configObj;
         this.logObj = logObj;
     }

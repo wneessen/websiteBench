@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -26,11 +26,11 @@ const node_libcurl_1 = require("node-libcurl");
 const websiteBenchTools_1 = __importDefault(require("./websiteBenchTools"));
 const qObj = __importStar(require("q"));
 class WebsiteBenchBrowser {
-    constructor(browserObj, configObj, logObj) {
+    constructor(configObj, logObj, browserObj) {
         this.toolsObj = new websiteBenchTools_1.default();
         this.logObj = null;
         this.numOfRetries = 3;
-        this.browserObj = browserObj;
+        this.browserObj = browserObj ? browserObj : null;
         this.configObj = configObj;
         this.logObj = logObj;
     }

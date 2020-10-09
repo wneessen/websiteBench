@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -23,12 +23,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const websiteBenchBrowser_1 = __importDefault(require("./lib/websiteBenchBrowser"));
+const websiteBenchInflux_1 = __importDefault(require("./lib/websiteBenchInflux"));
 const websiteBenchConfig_1 = __importDefault(require("./lib/websiteBenchConfig"));
 const websiteBenchEvents_1 = __importDefault(require("./lib/websiteBenchEvents"));
 const websiteBenchTools_1 = __importDefault(require("./lib/websiteBenchTools"));
 const puppeteer_1 = __importDefault(require("puppeteer"));
 const arg_1 = __importDefault(require("arg"));
-const influx_1 = require("influx");
 const tslog_1 = require("tslog");
 const process_1 = __importStar(require("process"));
 process_1.default.on('SIGINT', () => {
@@ -108,7 +108,8 @@ if (typeof cliArgs["--browsertype"] !== 'undefined' &&
     }
 }
 ;
-const configObj = new websiteBenchConfig_1.default(confFiles, logObj).configObj();
+const _configObj = new websiteBenchConfig_1.default(confFiles, logObj);
+const configObj = _configObj.configObj();
 if (typeof cliArgs["--log-resource-errors"] !== 'undefined') {
     configObj.logResErrors = cliArgs["--log-resource-errors"];
 }
@@ -138,41 +139,22 @@ logObj.attachTransport({
     error: toolsObj.logToFile,
     fatal: toolsObj.logToFile,
 }, configObj.logLevel);
-const influxClient = new influx_1.InfluxDB({
-    database: configObj.influxDb.database,
-    username: configObj.influxDb.username,
-    password: configObj.influxDb.password,
-    hosts: [
-        {
-            host: configObj.influxDb.hostname,
-            port: (configObj.influxDb.port !== null ? configObj.influxDb.port : 8086),
-            path: (configObj.influxDb.path !== null ? configObj.influxDb.path : '/'),
-            protocol: (configObj.influxDb.protocol !== null ? configObj.influxDb.protocol : 'http'),
-            options: {
-                rejectUnauthorized: (configObj.influxDb.ignoressl === true ? false : true)
-            }
-        }
-    ]
-});
-influxClient.getDatabaseNames().then(dbNames => {
-    if (dbNames.indexOf(configObj.influxDb.database) === -1) {
-        logObj.error(`Database "${configObj.influxDb.database}" not found on InfluxDB server.`);
-        process_1.exit(1);
-    }
-}).catch(errorMsg => {
-    logObj.error(`Unable to connect to InfluxDB:`);
-    logObj.error(errorMsg.message);
-    logObj.error(`Please check your influxDb config settings`);
-    process_1.exit(1);
-});
-const eventObj = new websiteBenchEvents_1.default(configObj, influxClient, logObj);
+const influxObj = new websiteBenchInflux_1.default(configObj, logObj);
+const eventObj = new websiteBenchEvents_1.default(configObj, influxObj, logObj);
 async function startServer() {
     logObj.info(`websiteBench v${configObj.versionNum} - Starting Server`);
-    const browserObj = await puppeteer_1.default.launch(pupLaunchOptions).catch(errorMsg => {
-        logObj.error(`Unable to start Browser: ${errorMsg}`);
-        process_1.default.exit(1);
+    await influxObj.checkConnection().catch(errorObj => {
+        logObj.error(`Connection test to InfluxDB failed: ${errorObj.message}`);
+        process_1.exit(1);
     });
-    const websiteBrowser = new websiteBenchBrowser_1.default(browserObj, configObj, logObj);
+    let browserObj = null;
+    if (_configObj.isBrowserNeeded()) {
+        browserObj = await puppeteer_1.default.launch(pupLaunchOptions).catch(errorMsg => {
+            logObj.error(`Unable to start Browser: ${errorMsg}`);
+            process_1.default.exit(1);
+        });
+    }
+    const websiteBrowser = new websiteBenchBrowser_1.default(configObj, logObj, browserObj);
     eventObj.browserObj = websiteBrowser;
     configObj.websiteList.forEach(webSite => {
         eventObj.scheduleSiteCheck(webSite);
