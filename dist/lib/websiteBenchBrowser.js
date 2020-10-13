@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -35,9 +35,25 @@ class WebsiteBenchBrowser {
         this.isLaunching = false;
         this.maxBrowserRestarts = 5;
         this.browserRestartCount = 0;
+        this.restartInterval = 1800000;
+        this.runningBrowserJobs = 0;
         this.configObj = configObj;
         this.logObj = logObj;
         this.isBrowserNeeded = isBrowserNeeded;
+        setInterval(async () => {
+            if (this.runningBrowserJobs === 0) {
+                this.logObj.debug('Trying to automatically restart browser...');
+                if (this.browserObj.isConnected()) {
+                    this.isLaunching = true;
+                    await this.browserObj.close().catch(errorObj => {
+                        logObj.error(`Error while closing browser: ${errorObj.message}`);
+                    }).then(() => { this.logObj.debug('Browser successfully closed.'); });
+                }
+            }
+            else {
+                this.logObj.debug('Skipping automatic browser restart, as browser is currently busy');
+            }
+        }, this.restartInterval);
     }
     async processPageWithBrowser(websiteEntry) {
         const webUrl = websiteEntry.siteUrl;
@@ -87,6 +103,7 @@ class WebsiteBenchBrowser {
         pageObj.on('console', eventObj => this.eventTriggered(eventObj));
         pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
         pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
+        this.runningBrowserJobs++;
         for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
             this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
@@ -118,6 +135,7 @@ class WebsiteBenchBrowser {
             this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
         }
         pageObj.close();
+        this.runningBrowserJobs--;
         perfData = {
             totalDurTime: (perfDataTotal.totalDurTime / this.numOfRetries),
             connectTime: (perfDataTotal.connectTime / this.numOfRetries),
@@ -216,9 +234,8 @@ class WebsiteBenchBrowser {
         }
     }
     async browserDisconnectEvent() {
-        this.logObj.error('The browser got disconnected. Trying to reconnect...');
+        this.logObj.warn('The browser got disconnected. Trying to reconnect/restart...');
         this.browserObj = await puppeteer_1.default.connect({ browserWSEndpoint: this.browserWsEndpoint }).catch(errorObj => {
-            this.logObj.error(`Reconnect failed: ${errorObj.message}. Trying to restart browser...`);
             return null;
         });
         if (this.browserObj === null || !this.browserObj.isConnected()) {

@@ -93,7 +93,7 @@ export default class WebsiteBenchEvents extends EventEmitter {
         const shortDelay = (2000 + this._toolsObj.getRandNum(5000));
 
         // Check if the browser is ready to accept requests
-        if(websiteEntry.checkType === 'browser' && !this.browserObj.browserIsReady()) {
+        if(websiteEntry.checkType !== 'curl' && !this.browserObj.browserIsReady()) {
             this.logObj.warn(`Browser is not ready yet. Delaying job by ${(randDelay / 1000).toFixed(3)} seconds...`);
             return setTimeout(() => {
                 this.emit(websiteEntry.siteName)

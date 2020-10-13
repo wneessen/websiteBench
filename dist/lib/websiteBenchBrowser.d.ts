@@ -12,6 +12,8 @@ export default class WebsiteBenchBrowser {
     private isLaunching;
     private maxBrowserRestarts;
     private browserRestartCount;
+    private restartInterval;
+    private runningBrowserJobs;
     constructor(configObj: IWebsiteBenchConfig, logObj: Logger, isBrowserNeeded: boolean);
     processPageWithBrowser(websiteEntry: IWebsiteEntry): Promise<IPerformanceData>;
     processPageWithCurl(websiteEntry: IWebsiteEntry): Promise<IPerformanceData>;

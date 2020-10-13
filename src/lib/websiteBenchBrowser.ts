@@ -4,6 +4,7 @@ import WebsiteBenchTools from './websiteBenchTools';
 import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry } from './websiteBenchInterfaces';
 import { Logger } from 'tslog';
 import * as qObj from 'q'
+import { errorMonitor } from 'stream';
 
 export default class WebsiteBenchBrowser {
     private browserObj: Puppeteer.Browser;
@@ -17,6 +18,8 @@ export default class WebsiteBenchBrowser {
     private isLaunching = false;
     private maxBrowserRestarts = 5;
     private browserRestartCount = 0;
+    private restartInterval = 1800000;
+    private runningBrowserJobs = 0;
     
     /**
      * Constructor
@@ -29,6 +32,20 @@ export default class WebsiteBenchBrowser {
         this.logObj = logObj;
         this.isBrowserNeeded = isBrowserNeeded;
 
+        setInterval(async () => {
+            if(this.runningBrowserJobs === 0) {
+                this.logObj.debug('Trying to automatically restart browser...');
+                if(this.browserObj.isConnected()) {
+                    this.isLaunching = true;
+                    await this.browserObj.close().catch(errorObj => {
+                        logObj.error(`Error while closing browser: ${errorObj.message}`);
+                    }).then(() => { this.logObj.debug('Browser successfully closed.') });
+                }
+            }
+            else {
+                this.logObj.debug('Skipping automatic browser restart, as browser is currently busy')
+            }
+        }, this.restartInterval);
     }
 
     /**
@@ -51,7 +68,7 @@ export default class WebsiteBenchBrowser {
             domContentTime: 0,
             domCompleteTime: 0,
         };
-        if(!this.browserIsReady()) return;
+        if(!this.browserIsReady()) return
 
         // Initialize Webbrowser page object (Incognito or not)
         this.browserCtx = await this.browserObj.createIncognitoBrowserContext().catch(errorObj => {
@@ -92,6 +109,7 @@ export default class WebsiteBenchBrowser {
         pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
 
         // Open the website for number of retries
+        this.runningBrowserJobs++;
         for(let runCount = 0; runCount < this.numOfRetries; runCount++) {
             this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`)
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
@@ -121,11 +139,11 @@ export default class WebsiteBenchBrowser {
                 perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
             }
             this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
-        
         }
         
         // Close the page
         pageObj.close();
+        this.runningBrowserJobs--;
 
         // Calculate mean values of performance data
         perfData = {
@@ -261,9 +279,8 @@ export default class WebsiteBenchBrowser {
      * @memberof WebsiteBenchBrowser
     */
     private async browserDisconnectEvent(): Promise<void> {
-        this.logObj.error('The browser got disconnected. Trying to reconnect...');
+        this.logObj.warn('The browser got disconnected. Trying to reconnect/restart...');
         this.browserObj = await Puppeteer.connect({browserWSEndpoint: this.browserWsEndpoint}).catch(errorObj => {
-            this.logObj.error(`Reconnect failed: ${errorObj.message}. Trying to restart browser...`);
             return null;
         });
         if(this.browserObj === null || !this.browserObj.isConnected()) {
