@@ -22,17 +22,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const puppeteer_1 = __importDefault(require("puppeteer"));
 const node_libcurl_1 = require("node-libcurl");
 const websiteBenchTools_1 = __importDefault(require("./websiteBenchTools"));
 const qObj = __importStar(require("q"));
 class WebsiteBenchBrowser {
-    constructor(configObj, logObj, browserObj) {
+    constructor(configObj, logObj, isBrowserNeeded) {
         this.toolsObj = new websiteBenchTools_1.default();
         this.logObj = null;
         this.numOfRetries = 3;
-        this.browserObj = browserObj ? browserObj : null;
+        this.isBrowserNeeded = false;
+        this.isLaunching = false;
+        this.maxBrowserRestarts = 5;
+        this.browserRestartCount = 0;
         this.configObj = configObj;
         this.logObj = logObj;
+        this.isBrowserNeeded = isBrowserNeeded;
     }
     async processPageWithBrowser(websiteEntry) {
         const webUrl = websiteEntry.siteUrl;
@@ -48,8 +53,25 @@ class WebsiteBenchBrowser {
             domContentTime: 0,
             domCompleteTime: 0,
         };
-        this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
-        const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
+        if (!this.browserIsReady())
+            return;
+        this.browserCtx = await this.browserObj.createIncognitoBrowserContext().catch(errorObj => {
+            this.logObj.error(`Unable to create browser context: ${errorObj.message}`);
+            return null;
+        });
+        if (this.browserCtx === null)
+            return;
+        const pageObj = this.configObj.allowCaching === true ?
+            await this.browserObj.newPage().catch(errorObj => {
+                this.logObj.error(`Failed to create new page in browser: ${errorObj.message}`);
+                return null;
+            }) :
+            await this.browserCtx.newPage().catch(errorObj => {
+                this.logObj.error(`Failed to create new page in browser: ${errorObj.message}`);
+                return null;
+            });
+        if (pageObj === null)
+            return;
         if (this.configObj.userAgent) {
             await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
                 this.logObj.error(`[Browser] Unable to set User-Agent string: ${errorMsg}`);
@@ -66,7 +88,7 @@ class WebsiteBenchBrowser {
         pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
         pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
         for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-            this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
+            this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
                 this.logObj.error(`[Browser] An error occured during "Page Goto" => ${errorMsg}`);
             });
@@ -93,7 +115,7 @@ class WebsiteBenchBrowser {
                 perfDataTotal.domContentTime += tempPerf.domContentTime;
                 perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
             }
-            this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
+            this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
         }
         pageObj.close();
         perfData = {
@@ -106,6 +128,7 @@ class WebsiteBenchBrowser {
             domContentTime: (perfDataTotal.domContentTime / this.numOfRetries),
             domCompleteTime: (perfDataTotal.domCompleteTime / this.numOfRetries)
         };
+        this.browserRestartCount = 0;
         return perfData;
     }
     async processPageWithCurl(websiteEntry) {
@@ -133,7 +156,7 @@ class WebsiteBenchBrowser {
                 userAgent = `${browserUserAgent} websiteBench/${this.configObj.versionNum}`;
             }
             for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-                this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
+                this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
                 const deferObj = qObj.defer();
                 const curlObj = new node_libcurl_1.Curl();
                 curlObj.setOpt('URL', webUrl);
@@ -157,7 +180,7 @@ class WebsiteBenchBrowser {
                 });
                 curlObj.on('error', (errorObj) => {
                     this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`);
-                    this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl} (Run: ${runCount})...`);
+                    this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl} (Run: ${runCount + 1})...`);
                 });
                 curlObj.perform();
                 promiseArray.push(deferObj.promise);
@@ -192,6 +215,19 @@ class WebsiteBenchBrowser {
             eventObj.dismiss();
         }
     }
+    async browserDisconnectEvent() {
+        this.logObj.error('The browser got disconnected. Trying to reconnect...');
+        this.browserObj = await puppeteer_1.default.connect({ browserWSEndpoint: this.browserWsEndpoint }).catch(errorObj => {
+            this.logObj.error(`Reconnect failed: ${errorObj.message}. Trying to restart browser...`);
+            return null;
+        });
+        if (this.browserObj === null || !this.browserObj.isConnected()) {
+            await this.launchBrowser().catch(errorObj => {
+                this.logObj.error(`Unable to restart browser: ${errorObj.message}. Quitting.`);
+                process.exit(1);
+            });
+        }
+    }
     async errorTriggered(requestObj, websiteEntry) {
         if (this.configObj.logResErrors === true) {
             this.logObj.error(`[${websiteEntry.siteName}] Unable to load resource URL => ${requestObj.url()}`);
@@ -216,6 +252,36 @@ class WebsiteBenchBrowser {
             perfData.domCompleteTime = (perfEntry.domComplete - perfEntry.domContentLoadedEventEnd);
         }
         return perfData;
+    }
+    async launchBrowser() {
+        if (this.browserRestartCount >= this.maxBrowserRestarts) {
+            this.logObj.error(`Maximum amount of browser restarts w/o successful querying reached. Quitting`);
+            process.exit(1);
+        }
+        if (this.isBrowserNeeded) {
+            this.isLaunching = true;
+            await puppeteer_1.default.launch(this.configObj.pupLaunchOptions).catch(errorMsg => {
+                this.logObj.error(`Unable to start Browser: ${errorMsg}`);
+            }).then(newBrowser => {
+                if (typeof newBrowser !== 'undefined' && newBrowser !== null) {
+                    this.browserObj = newBrowser;
+                    this.browserWsEndpoint = this.browserObj.wsEndpoint();
+                    this.browserObj.on('disconnected', () => this.browserDisconnectEvent());
+                    this.isLaunching = false;
+                    this.browserRestartCount++;
+                }
+            });
+            if (typeof this.browserObj === 'undefined' || this.browserObj === null || !this.browserObj.isConnected()) {
+                this.logObj.error('Could not start browser. Quitting.');
+                process.exit(1);
+            }
+        }
+    }
+    browserIsReady() {
+        if (this.isLaunching === true || !this.browserObj.isConnected()) {
+            return false;
+        }
+        return true;
     }
 }
 exports.default = WebsiteBenchBrowser;

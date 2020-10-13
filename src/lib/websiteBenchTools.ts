@@ -1,4 +1,3 @@
-import { IWebsiteBenchConfig } from './websiteBenchInterfaces';
 import Puppeteer from 'puppeteer';
 import { ILogObject } from 'tslog'
 import { appendFile } from 'fs';

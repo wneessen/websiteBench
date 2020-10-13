@@ -1,3 +1,5 @@
+import Puppeteer from 'puppeteer';
+
 /******************************************************************************
 * Interfaces and declarations
 ******************************************************************************/
@@ -16,6 +18,7 @@ interface IWebsiteBenchConfig {
     versionNum?: string,
     instanceName?: string,
     ignoreSslErrors?: boolean,
+    pupLaunchOptions?: Puppeteer.LaunchOptions,
     logLevel?: 'silly'|'trace'|'debug'|'info'|'warn'|'error'|'fatal',
 }
 
