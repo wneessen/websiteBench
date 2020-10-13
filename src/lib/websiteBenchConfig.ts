@@ -8,7 +8,7 @@ export default class WebsiteBenchConfig {
     private _configObj: IWebsiteBenchConfig = {};
 
     // Defaults config settings
-    private _versionNum = '1.5.1';
+    private _versionNum = '1.5.2';
     private _allowCaching = false;
     private _ignoreSslErrors = false;
     private _logResourceErrors = false;

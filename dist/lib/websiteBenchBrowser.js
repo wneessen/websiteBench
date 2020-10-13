@@ -40,20 +40,22 @@ class WebsiteBenchBrowser {
         this.configObj = configObj;
         this.logObj = logObj;
         this.isBrowserNeeded = isBrowserNeeded;
-        setInterval(async () => {
-            if (this.runningBrowserJobs === 0) {
-                this.logObj.debug('Trying to automatically restart browser...');
-                if (this.browserObj.isConnected()) {
-                    this.isLaunching = true;
-                    await this.browserObj.close().catch(errorObj => {
-                        logObj.error(`Error while closing browser: ${errorObj.message}`);
-                    }).then(() => { this.logObj.debug('Browser successfully closed.'); });
+        if (isBrowserNeeded) {
+            setInterval(async () => {
+                if (this.runningBrowserJobs === 0) {
+                    this.logObj.debug('Trying to automatically restart browser...');
+                    if (this.browserObj.isConnected()) {
+                        this.isLaunching = true;
+                        await this.browserObj.close().catch(errorObj => {
+                            logObj.error(`Error while closing browser: ${errorObj.message}`);
+                        }).then(() => { this.logObj.debug('Browser successfully closed.'); });
+                    }
                 }
-            }
-            else {
-                this.logObj.debug('Skipping automatic browser restart, as browser is currently busy');
-            }
-        }, this.restartInterval);
+                else {
+                    this.logObj.debug('Skipping automatic browser restart, as browser is currently busy');
+                }
+            }, this.restartInterval);
+        }
     }
     async processPageWithBrowser(websiteEntry) {
         const webUrl = websiteEntry.siteUrl;
