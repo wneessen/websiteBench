@@ -1,3 +1,4 @@
+import Puppeteer from 'puppeteer';
 interface IWebsiteBenchConfig {
     websiteList?: Array<IWebsiteEntry>;
     influxDb?: IInfluxDbConfig;
@@ -8,6 +9,7 @@ interface IWebsiteBenchConfig {
     versionNum?: string;
     instanceName?: string;
     ignoreSslErrors?: boolean;
+    pupLaunchOptions?: Puppeteer.LaunchOptions;
     logLevel?: 'silly' | 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 }
 interface IWebsiteEntry {

@@ -1,5 +1,5 @@
 import Puppeteer from 'puppeteer';
-import { Curl, CurlInfo, CurlInfoName, CurlProgressFunc } from 'node-libcurl';
+import { Curl } from 'node-libcurl';
 import WebsiteBenchTools from './websiteBenchTools';
 import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry } from './websiteBenchInterfaces';
 import { Logger } from 'tslog';
@@ -8,10 +8,15 @@ import * as qObj from 'q'
 export default class WebsiteBenchBrowser {
     private browserObj: Puppeteer.Browser;
     private browserCtx: Puppeteer.BrowserContext;
+    private browserWsEndpoint: string;
     private configObj: IWebsiteBenchConfig;
     private toolsObj = new WebsiteBenchTools();
     private logObj: Logger = null;
     private numOfRetries = 3;
+    private isBrowserNeeded = false;
+    private isLaunching = false;
+    private maxBrowserRestarts = 5;
+    private browserRestartCount = 0;
     
     /**
      * Constructor
@@ -19,10 +24,11 @@ export default class WebsiteBenchBrowser {
      * @constructor
      * @memberof WebsiteBenchBrowser
     */
-    constructor(configObj: IWebsiteBenchConfig, logObj: Logger, browserObj?: Puppeteer.Browser) {
-        this.browserObj = browserObj ? browserObj : null;
+    constructor(configObj: IWebsiteBenchConfig, logObj: Logger, isBrowserNeeded: boolean) {
         this.configObj  = configObj;
         this.logObj = logObj;
+        this.isBrowserNeeded = isBrowserNeeded;
+
     }
 
     /**
@@ -45,10 +51,24 @@ export default class WebsiteBenchBrowser {
             domContentTime: 0,
             domCompleteTime: 0,
         };
+        if(!this.browserIsReady()) return;
 
         // Initialize Webbrowser page object (Incognito or not)
-        this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
-        const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
+        this.browserCtx = await this.browserObj.createIncognitoBrowserContext().catch(errorObj => {
+            this.logObj.error(`Unable to create browser context: ${errorObj.message}`);
+            return null;
+        });
+        if(this.browserCtx === null) return;
+        const pageObj: Puppeteer.Page = this.configObj.allowCaching === true ?
+            await this.browserObj.newPage().catch(errorObj => {
+                this.logObj.error(`Failed to create new page in browser: ${errorObj.message}`);
+                return null;
+            }) :
+            await this.browserCtx.newPage().catch(errorObj => {
+                this.logObj.error(`Failed to create new page in browser: ${errorObj.message}`);
+                return null;
+            })
+        if(pageObj === null) return;
 
         // Set User-Agent
         if(this.configObj.userAgent) {
@@ -120,6 +140,7 @@ export default class WebsiteBenchBrowser {
         }
 
         // Finalize response data
+        this.browserRestartCount = 0;
         return perfData;
     }
 
@@ -231,6 +252,27 @@ export default class WebsiteBenchBrowser {
             eventObj.dismiss();
         }
     }
+    
+    /**
+     * Eventhandler for when the browser disconnects
+     *
+     * @param  eventObj The Puppeteer event object
+     * @returns {Promise<void>}
+     * @memberof WebsiteBenchBrowser
+    */
+    private async browserDisconnectEvent(): Promise<void> {
+        this.logObj.error('The browser got disconnected. Trying to reconnect...');
+        this.browserObj = await Puppeteer.connect({browserWSEndpoint: this.browserWsEndpoint}).catch(errorObj => {
+            this.logObj.error(`Reconnect failed: ${errorObj.message}. Trying to restart browser...`);
+            return null;
+        });
+        if(this.browserObj === null || !this.browserObj.isConnected()) {
+            await this.launchBrowser().catch(errorObj => {
+                this.logObj.error(`Unable to restart browser: ${errorObj.message}. Quitting.`);
+                process.exit(1);
+            });
+        }
+    }
 
     /**
      * Eventhandler for when an error in the website fired
@@ -272,5 +314,51 @@ export default class WebsiteBenchBrowser {
         }
 
         return perfData;
+    }
+    
+    /**
+     * Launch the browser
+     *
+     * @returns {Promise<void>}
+     * @memberof WebsiteBenchBrowser
+    */
+    public async launchBrowser() {
+        if(this.browserRestartCount >= this.maxBrowserRestarts) {
+            this.logObj.error(`Maximum amount of browser restarts w/o successful querying reached. Quitting`);
+            process.exit(1);
+        }
+        if(this.isBrowserNeeded) {
+            this.isLaunching = true;
+            await Puppeteer.launch(this.configObj.pupLaunchOptions).catch(errorMsg => {
+                this.logObj.error(`Unable to start Browser: ${errorMsg}`);
+            }).then(newBrowser => {
+                if(typeof newBrowser !== 'undefined' && newBrowser !== null) {
+                    this.browserObj = newBrowser;
+                    this.browserWsEndpoint = this.browserObj.wsEndpoint();
+                    this.browserObj.on('disconnected', () => this.browserDisconnectEvent());
+                    this.isLaunching = false;
+                    this.browserRestartCount++;
+                }
+            });
+
+            if(typeof this.browserObj === 'undefined' || this.browserObj === null || !this.browserObj.isConnected()) {
+                this.logObj.error('Could not start browser. Quitting.');
+                process.exit(1);
+            }
+        }
+    }
+    
+    /**
+     * Is the browser ready?
+     *
+     * @returns {boolean}
+     * @memberof WebsiteBenchBrowser
+    */
+    public browserIsReady() {
+        if(this.isLaunching === true || !this.browserObj.isConnected()) {
+            return false;
+        }
+
+        return true;
     }
 }

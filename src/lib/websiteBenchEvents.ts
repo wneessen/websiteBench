@@ -2,7 +2,6 @@ import WebsiteBenchBrowser from './websiteBenchBrowser';
 import WebsiteBenchTools from './websiteBenchTools';
 import { IPerformanceData, IWebsiteBenchConfig, IWebsiteEntry } from './websiteBenchInterfaces';
 import { EventEmitter } from 'events';
-import { InfluxDB } from 'influx';
 import { Logger } from 'tslog';
 import WebsiteBenchInflux from './websiteBenchInflux';
 
@@ -92,6 +91,14 @@ export default class WebsiteBenchEvents extends EventEmitter {
         this.logObj.debug(`Initializing performance check for site: ${websiteEntry.siteName}`);
         const randDelay = (5000 + this._toolsObj.getRandNum(10000));
         const shortDelay = (2000 + this._toolsObj.getRandNum(5000));
+
+        // Check if the browser is ready to accept requests
+        if(websiteEntry.checkType === 'browser' && !this.browserObj.browserIsReady()) {
+            this.logObj.warn(`Browser is not ready yet. Delaying job by ${(randDelay / 1000).toFixed(3)} seconds...`);
+            return setTimeout(() => {
+                this.emit(websiteEntry.siteName)
+            }, randDelay);
+        }
 
         // Check if the max. amount of concurrent jobs is already reached
         if(this._currentlyRunning >= this._configObj.maxConcurrentJobs) {

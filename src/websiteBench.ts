@@ -94,6 +94,7 @@ const _configObj = new WebsiteBenchConfig(confFiles, logObj);
 const configObj = _configObj.configObj();
 if(typeof cliArgs["--log-resource-errors"] !== 'undefined') { configObj.logResErrors = cliArgs["--log-resource-errors"] };
 if(typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') { pupLaunchOptions.ignoreHTTPSErrors = true; configObj.ignoreSslErrors = true };
+configObj.pupLaunchOptions = pupLaunchOptions;
 
 // Additional CLI params handling
 if(typeof cliArgs["--help"] !== 'undefined') { showHelp(); process.exit(0); };
@@ -134,17 +135,10 @@ async function startServer(): Promise<void> {
         logObj.error(`Connection test to InfluxDB failed: ${errorObj.message}`);
         exit(1);
     });
-    
-    // Open the browser
-    let browserObj: Puppeteer.Browser = null;
-    if(_configObj.isBrowserNeeded()) {
-        browserObj = await Puppeteer.launch(pupLaunchOptions).catch(errorMsg => {
-            logObj.error(`Unable to start Browser: ${errorMsg}`);
-            process.exit(1);
-        });
 
-    }
-    const websiteBrowser = new WebsiteBenchBrowser(configObj, logObj, browserObj);
+    let isBrowserNeeded = _configObj.isBrowserNeeded();
+    const websiteBrowser = new WebsiteBenchBrowser(configObj, logObj, isBrowserNeeded);
+    await websiteBrowser.launchBrowser();
     eventObj.browserObj = websiteBrowser;
     
     configObj.websiteList.forEach(webSite => {

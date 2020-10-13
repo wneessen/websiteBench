@@ -1,6 +1,5 @@
 // websiteBench Config Class
 import { IWebsiteBenchConfig } from './websiteBenchInterfaces';
-import { exit } from 'process';
 import { Logger } from 'tslog';
 import * as influxDbClientObj from '@influxdata/influxdb-client'
 import { BucketsAPI } from '@influxdata/influxdb-client-apis';

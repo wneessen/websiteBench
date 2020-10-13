@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -27,7 +27,6 @@ const websiteBenchInflux_1 = __importDefault(require("./lib/websiteBenchInflux")
 const websiteBenchConfig_1 = __importDefault(require("./lib/websiteBenchConfig"));
 const websiteBenchEvents_1 = __importDefault(require("./lib/websiteBenchEvents"));
 const websiteBenchTools_1 = __importDefault(require("./lib/websiteBenchTools"));
-const puppeteer_1 = __importDefault(require("puppeteer"));
 const arg_1 = __importDefault(require("arg"));
 const tslog_1 = require("tslog");
 const process_1 = __importStar(require("process"));
@@ -119,6 +118,7 @@ if (typeof cliArgs["--ignore-ssl-errors"] !== 'undefined') {
     configObj.ignoreSslErrors = true;
 }
 ;
+configObj.pupLaunchOptions = pupLaunchOptions;
 if (typeof cliArgs["--help"] !== 'undefined') {
     showHelp();
     process_1.default.exit(0);
@@ -147,14 +147,9 @@ async function startServer() {
         logObj.error(`Connection test to InfluxDB failed: ${errorObj.message}`);
         process_1.exit(1);
     });
-    let browserObj = null;
-    if (_configObj.isBrowserNeeded()) {
-        browserObj = await puppeteer_1.default.launch(pupLaunchOptions).catch(errorMsg => {
-            logObj.error(`Unable to start Browser: ${errorMsg}`);
-            process_1.default.exit(1);
-        });
-    }
-    const websiteBrowser = new websiteBenchBrowser_1.default(configObj, logObj, browserObj);
+    let isBrowserNeeded = _configObj.isBrowserNeeded();
+    const websiteBrowser = new websiteBenchBrowser_1.default(configObj, logObj, isBrowserNeeded);
+    await websiteBrowser.launchBrowser();
     eventObj.browserObj = websiteBrowser;
     configObj.websiteList.forEach(webSite => {
         eventObj.scheduleSiteCheck(webSite);

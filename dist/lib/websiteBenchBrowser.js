@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -22,17 +22,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const puppeteer_1 = __importDefault(require("puppeteer"));
 const node_libcurl_1 = require("node-libcurl");
 const websiteBenchTools_1 = __importDefault(require("./websiteBenchTools"));
 const qObj = __importStar(require("q"));
 class WebsiteBenchBrowser {
-    constructor(configObj, logObj, browserObj) {
+    constructor(configObj, logObj, isBrowserNeeded) {
         this.toolsObj = new websiteBenchTools_1.default();
         this.logObj = null;
         this.numOfRetries = 3;
-        this.browserObj = browserObj ? browserObj : null;
+        this.isBrowserNeeded = false;
+        this.isLaunching = false;
+        this.maxBrowserRestarts = 5;
+        this.browserRestartCount = 0;
         this.configObj = configObj;
         this.logObj = logObj;
+        this.isBrowserNeeded = isBrowserNeeded;
     }
     async processPageWithBrowser(websiteEntry) {
         const webUrl = websiteEntry.siteUrl;
@@ -48,8 +53,25 @@ class WebsiteBenchBrowser {
             domContentTime: 0,
             domCompleteTime: 0,
         };
-        this.browserCtx = await this.browserObj.createIncognitoBrowserContext();
-        const pageObj = this.configObj.allowCaching === true ? await this.browserObj.newPage() : await this.browserCtx.newPage();
+        if (!this.browserIsReady())
+            return;
+        this.browserCtx = await this.browserObj.createIncognitoBrowserContext().catch(errorObj => {
+            this.logObj.error(`Unable to create browser context: ${errorObj.message}`);
+            return null;
+        });
+        if (this.browserCtx === null)
+            return;
+        const pageObj = this.configObj.allowCaching === true ?
+            await this.browserObj.newPage().catch(errorObj => {
+                this.logObj.error(`Failed to create new page in browser: ${errorObj.message}`);
+                return null;
+            }) :
+            await this.browserCtx.newPage().catch(errorObj => {
+                this.logObj.error(`Failed to create new page in browser: ${errorObj.message}`);
+                return null;
+            });
+        if (pageObj === null)
+            return;
         if (this.configObj.userAgent) {
             await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
                 this.logObj.error(`[Browser] Unable to set User-Agent string: ${errorMsg}`);
@@ -106,6 +128,7 @@ class WebsiteBenchBrowser {
             domContentTime: (perfDataTotal.domContentTime / this.numOfRetries),
             domCompleteTime: (perfDataTotal.domCompleteTime / this.numOfRetries)
         };
+        this.browserRestartCount = 0;
         return perfData;
     }
     async processPageWithCurl(websiteEntry) {
@@ -192,6 +215,19 @@ class WebsiteBenchBrowser {
             eventObj.dismiss();
         }
     }
+    async browserDisconnectEvent() {
+        this.logObj.error('The browser got disconnected. Trying to reconnect...');
+        this.browserObj = await puppeteer_1.default.connect({ browserWSEndpoint: this.browserWsEndpoint }).catch(errorObj => {
+            this.logObj.error(`Reconnect failed: ${errorObj.message}. Trying to restart browser...`);
+            return null;
+        });
+        if (this.browserObj === null || !this.browserObj.isConnected()) {
+            await this.launchBrowser().catch(errorObj => {
+                this.logObj.error(`Unable to restart browser: ${errorObj.message}. Quitting.`);
+                process.exit(1);
+            });
+        }
+    }
     async errorTriggered(requestObj, websiteEntry) {
         if (this.configObj.logResErrors === true) {
             this.logObj.error(`[${websiteEntry.siteName}] Unable to load resource URL => ${requestObj.url()}`);
@@ -216,6 +252,36 @@ class WebsiteBenchBrowser {
             perfData.domCompleteTime = (perfEntry.domComplete - perfEntry.domContentLoadedEventEnd);
         }
         return perfData;
+    }
+    async launchBrowser() {
+        if (this.browserRestartCount >= this.maxBrowserRestarts) {
+            this.logObj.error(`Maximum amount of browser restarts w/o successful querying reached. Quitting`);
+            process.exit(1);
+        }
+        if (this.isBrowserNeeded) {
+            this.isLaunching = true;
+            await puppeteer_1.default.launch(this.configObj.pupLaunchOptions).catch(errorMsg => {
+                this.logObj.error(`Unable to start Browser: ${errorMsg}`);
+            }).then(newBrowser => {
+                if (typeof newBrowser !== 'undefined' && newBrowser !== null) {
+                    this.browserObj = newBrowser;
+                    this.browserWsEndpoint = this.browserObj.wsEndpoint();
+                    this.browserObj.on('disconnected', () => this.browserDisconnectEvent());
+                    this.isLaunching = false;
+                    this.browserRestartCount++;
+                }
+            });
+            if (typeof this.browserObj === 'undefined' || this.browserObj === null || !this.browserObj.isConnected()) {
+                this.logObj.error('Could not start browser. Quitting.');
+                process.exit(1);
+            }
+        }
+    }
+    browserIsReady() {
+        if (this.isLaunching === true || !this.browserObj.isConnected()) {
+            return false;
+        }
+        return true;
     }
 }
 exports.default = WebsiteBenchBrowser;
