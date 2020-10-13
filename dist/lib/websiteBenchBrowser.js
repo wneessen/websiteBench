@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -66,7 +66,7 @@ class WebsiteBenchBrowser {
         pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
         pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
         for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-            this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
+            this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
                 this.logObj.error(`[Browser] An error occured during "Page Goto" => ${errorMsg}`);
             });
@@ -93,7 +93,7 @@ class WebsiteBenchBrowser {
                 perfDataTotal.domContentTime += tempPerf.domContentTime;
                 perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
             }
-            this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
+            this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
         }
         pageObj.close();
         perfData = {
@@ -133,7 +133,7 @@ class WebsiteBenchBrowser {
                 userAgent = `${browserUserAgent} websiteBench/${this.configObj.versionNum}`;
             }
             for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-                this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl} (Run: ${runCount})...`);
+                this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
                 const deferObj = qObj.defer();
                 const curlObj = new node_libcurl_1.Curl();
                 curlObj.setOpt('URL', webUrl);
@@ -157,7 +157,7 @@ class WebsiteBenchBrowser {
                 });
                 curlObj.on('error', (errorObj) => {
                     this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`);
-                    this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl} (Run: ${runCount})...`);
+                    this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl} (Run: ${runCount + 1})...`);
                 });
                 curlObj.perform();
                 promiseArray.push(deferObj.promise);

@@ -73,7 +73,7 @@ export default class WebsiteBenchBrowser {
 
         // Open the website for number of retries
         for(let runCount = 0; runCount < this.numOfRetries; runCount++) {
-            this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount})...`)
+            this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`)
             const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
                 this.logObj.error(`[Browser] An error occured during "Page Goto" => ${errorMsg}`)
             });
@@ -100,7 +100,7 @@ export default class WebsiteBenchBrowser {
                 perfDataTotal.domContentTime += tempPerf.domContentTime;
                 perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
             }
-            this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount})...`);
+            this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
         
         }
         
@@ -159,7 +159,7 @@ export default class WebsiteBenchBrowser {
             
             // Open the website for number of retries
             for(let runCount = 0; runCount < this.numOfRetries; runCount++) {
-                this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl} (Run: ${runCount})...`)
+                this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`)
                 const deferObj = qObj.defer();
                 const curlObj = new Curl();
                 curlObj.setOpt('URL', webUrl);
@@ -184,7 +184,7 @@ export default class WebsiteBenchBrowser {
                 });
                 curlObj.on('error', (errorObj) => {
                     this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`)
-                    this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl} (Run: ${runCount})...`);
+                    this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl} (Run: ${runCount + 1})...`);
                 })
                 curlObj.perform();
                 promiseArray.push(deferObj.promise as qObj.Promise<IPerformanceData>);
