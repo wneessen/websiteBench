@@ -60,6 +60,11 @@ export default class WebsiteBenchEvents extends EventEmitter {
             this.logObj.warn(`${websiteObj.siteUrl} already scheduled. Not scheduling a second time.`);
             return;
         }
+        
+        if(websiteObj.isDisabled) {
+            this.logObj.debug(`Website entry "${websiteObj.siteName} is set to disabled. Skipping.`);
+            return;
+        }
 
         // Set the eventlistener
         this.logObj.debug(`Adding EventListener for Site "${websiteObj.siteName}"`);
@@ -110,14 +115,22 @@ export default class WebsiteBenchEvents extends EventEmitter {
 
         this._currentlyRunning++;
         setTimeout(async () => {
-            let perfJson;
+            let perfJson, perfResourceJson;
             let checkType = ('checkType' in websiteEntry && websiteEntry.checkType === 'curl') ? 'cURL' : 'Browser';
             this.logObj.debug(`Executing perfomance check for site: ${websiteEntry.siteName} (via ${checkType})`);
             if(checkType === 'cURL') {
+                const startTime = Date.now();
                 perfJson = await this._browserObj.processPageWithCurl(websiteEntry);
+                const processingTime = Date.now() - startTime;
+                this.logObj.debug(`Performance check completed in ${processingTime / 1000} seconds`);
             }
             else {
-                perfJson = await this._browserObj.processPageWithBrowser(websiteEntry);
+                const startTime = Date.now();
+                const perfObj = await this._browserObj.processPageWithBrowser(websiteEntry);
+                perfJson = perfObj.perfData;
+                perfResourceJson = perfObj.resourcePerfData;
+                const processingTime = Date.now() - startTime;
+                this.logObj.debug(`Performance check completed in ${processingTime / 1000} seconds`);
             }
             this._currentlyRunning--;
 
@@ -151,7 +164,7 @@ export default class WebsiteBenchEvents extends EventEmitter {
                         download: perfJson.downloadTime ? perfJson.downloadTime : -1,
                         tlsHandshake: perfJson.tlsHandshake ? perfJson.tlsHandshake : -1,
                         preTransfer: perfJson.preTransfer ? perfJson.preTransfer : -1,
-                        statusCodes: perfJson.statusCodesString ? perfJson.statusCodesString : '',
+                        statusCode: perfJson.statusCode ? perfJson.statusCode : -1,
                         dom_int: perfJson.domIntTime ? perfJson.domIntTime : -1,
                         dom_content: perfJson.domContentTime ? perfJson.domContentTime : -1,
                         dom_complete: perfJson.domCompleteTime ? perfJson.domCompleteTime : -1

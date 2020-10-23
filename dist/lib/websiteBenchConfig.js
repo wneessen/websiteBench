@@ -5,7 +5,7 @@ const process_1 = require("process");
 class WebsiteBenchConfig {
     constructor(confFiles, logObj) {
         this._configObj = {};
-        this._versionNum = '1.5.2';
+        this._versionNum = '1.5.3-dev';
         this._allowCaching = false;
         this._ignoreSslErrors = false;
         this._logResourceErrors = false;
@@ -143,6 +143,11 @@ class WebsiteBenchConfig {
                 configError.hasError = true;
                 configError.errorProperty = 'websiteList => checkType';
                 configError.errorMessage = 'Value of "checkType" is not a string';
+            }
+            if ('isDisabled' in websiteEntry && typeof websiteEntry.isDisabled !== 'boolean') {
+                configError.hasError = true;
+                configError.errorProperty = 'websiteList => isDisabled';
+                configError.errorMessage = 'Value of "isDisabled" is not a boolean';
             }
             if (!('checkInterval' in websiteEntry) || typeof websiteEntry.checkInterval !== 'number') {
                 configError.hasError = true;

@@ -1,4 +1,4 @@
-import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry } from './websiteBenchInterfaces';
+import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry, IBrowserPerfReturn } from './websiteBenchInterfaces';
 import { Logger } from 'tslog';
 export default class WebsiteBenchBrowser {
     private browserObj;
@@ -7,7 +7,6 @@ export default class WebsiteBenchBrowser {
     private configObj;
     private toolsObj;
     private logObj;
-    private numOfRetries;
     private isBrowserNeeded;
     private isLaunching;
     private maxBrowserRestarts;
@@ -15,12 +14,13 @@ export default class WebsiteBenchBrowser {
     private restartInterval;
     private runningBrowserJobs;
     constructor(configObj: IWebsiteBenchConfig, logObj: Logger, isBrowserNeeded: boolean);
-    processPageWithBrowser(websiteEntry: IWebsiteEntry): Promise<IPerformanceData>;
+    processPageWithBrowser(websiteEntry: IWebsiteEntry): Promise<IBrowserPerfReturn>;
     processPageWithCurl(websiteEntry: IWebsiteEntry): Promise<IPerformanceData>;
     private eventTriggered;
     private browserDisconnectEvent;
     private errorTriggered;
     private processPerformanceData;
+    private processResourcePerformanceData;
     launchBrowser(): Promise<void>;
     browserIsReady(): boolean;
 }

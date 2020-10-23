@@ -16,6 +16,7 @@ interface IWebsiteEntry {
     siteName: string;
     siteUrl: string;
     checkInterval: number;
+    isDisabled: boolean;
     checkType?: "curl" | "browser";
 }
 interface IInfluxDbConfig {
@@ -48,9 +49,6 @@ interface IPerformanceData {
     tlsHandshake?: number;
     preTransfer?: number;
     statusCode?: number;
-    statusCodes?: Array<number>;
-    statusCodesString?: string;
-    runNumber?: number;
 }
 interface IConfigError {
     hasError: boolean;
@@ -61,5 +59,9 @@ interface IConfigFiles {
     configFile: string;
     secretsFile: string;
 }
-export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles };
+interface IBrowserPerfReturn {
+    resourcePerfData: Array<IPerformanceData>;
+    perfData: IPerformanceData;
+}
+export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles, IBrowserPerfReturn };
 //# sourceMappingURL=websiteBenchInterfaces.d.ts.map
