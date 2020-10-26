@@ -8,7 +8,7 @@ export default class WebsiteBenchConfig {
     private _configObj: IWebsiteBenchConfig = {};
 
     // Defaults config settings
-    private _versionNum = '1.5.2';
+    private _versionNum = '2.0.0';
     private _allowCaching = false;
     private _ignoreSslErrors = false;
     private _logResourceErrors = false;
@@ -187,6 +187,11 @@ export default class WebsiteBenchConfig {
                 configError.hasError = true;
                 configError.errorProperty = 'websiteList => checkType';
                 configError.errorMessage = 'Value of "checkType" is not a string';
+            }
+            if('isDisabled' in websiteEntry && typeof websiteEntry.isDisabled !== 'boolean') {
+                configError.hasError = true;
+                configError.errorProperty = 'websiteList => isDisabled';
+                configError.errorMessage = 'Value of "isDisabled" is not a boolean';
             }
             if(!('checkInterval' in websiteEntry) || typeof websiteEntry.checkInterval !== 'number') {
                 configError.hasError = true;

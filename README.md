@@ -74,7 +74,8 @@ The config accepts the following options:
         {
             "siteName": "Your other great Site",
             "siteUrl": "https://example.dev/",
-            "checkInterval": 60
+            "checkInterval": 60,
+            "isDisabled": true
         }
     ],
     "influxDb": {
@@ -89,9 +90,9 @@ The config accepts the following options:
         "password": "VerySecurePassw0rd!"
     },
     "allowCaching": false,
-	  "logLevel": "info",
+    "logLevel": "info",
     "maxConcurrentJobs": 5,
-    "instanceName": "DC1-CGN-I1"
+    "instanceName": "DC1-CGN-Instance1"
 }
 ```
 - ```websiteList (Array<IWebEntry>)```: List of websites to collect performance data on
@@ -110,6 +111,7 @@ The config accepts the following options:
   -  ```siteUrl (String)```: The URL to monitor
   -  ```checkInterval (Number)```: The interval to perform the checks on (in seconds). Minimum value is 60 seconds.
   -  ```checkType (String)```: The type of performance check to run. Can be either "curl" or "browser" (Default: browser)
+  -  ```isDisabled (boolean)```: If this is set to true, the website will not be monitored
 - ```IInfluxDbConfig (Object)```: Consists of the following settings:
   -  ```hostname (String)```: Hostname or IP of the InfluxDB server
   -  ```database (String)```: InfluxDB database name to store the metrics in

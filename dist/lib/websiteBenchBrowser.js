@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -30,7 +30,6 @@ class WebsiteBenchBrowser {
     constructor(configObj, logObj, isBrowserNeeded) {
         this.toolsObj = new websiteBenchTools_1.default();
         this.logObj = null;
-        this.numOfRetries = 3;
         this.isBrowserNeeded = false;
         this.isLaunching = false;
         this.maxBrowserRestarts = 5;
@@ -61,16 +60,10 @@ class WebsiteBenchBrowser {
         const webUrl = websiteEntry.siteUrl;
         const reqTimeout = websiteEntry.checkInterval - 1;
         let perfData = null;
-        const perfDataTotal = {
-            totalDurTime: 0,
-            connectTime: 0,
-            dnsTime: 0,
-            ttfbTime: 0,
-            downloadTime: 0,
-            domIntTime: 0,
-            domContentTime: 0,
-            domCompleteTime: 0,
-        };
+        let resourcePerfDataArray = [];
+        let statusCode;
+        let resStatusCodes = [];
+        let resStatusTexts = [];
         if (!this.browserIsReady())
             return;
         this.browserCtx = await this.browserObj.createIncognitoBrowserContext().catch(errorObj => {
@@ -90,6 +83,9 @@ class WebsiteBenchBrowser {
             });
         if (pageObj === null)
             return;
+        if (this.configObj.allowCaching === false) {
+            await pageObj.setCacheEnabled(false);
+        }
         if (this.configObj.userAgent) {
             await pageObj.setUserAgent(this.configObj.userAgent).catch(errorMsg => {
                 this.logObj.error(`[Browser] Unable to set User-Agent string: ${errorMsg}`);
@@ -104,52 +100,71 @@ class WebsiteBenchBrowser {
         pageObj.setDefaultTimeout(reqTimeout * 1000);
         pageObj.on('console', eventObj => this.eventTriggered(eventObj));
         pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
-        pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
-        this.runningBrowserJobs++;
-        for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-            this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
-            const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
-                this.logObj.error(`[Browser] An error occured during "Page Goto" => ${errorMsg}`);
-            });
-            if (!httpResponse)
-                return;
-            const perfElementHandler = await pageObj.$('pageData').catch(errorMsg => {
-                this.logObj.error(`[Browser] An error occured during "Performance Element Handling" => ${errorMsg}`);
-            });
-            if (typeof perfElementHandler !== 'object')
-                return;
-            const perfJson = await pageObj.evaluate(pageData => {
-                return JSON.stringify(performance.getEntriesByType('navigation'));
-            }, perfElementHandler).catch(errorMsg => {
-                this.logObj.error(`[Browser] An error occured "Page evaluation" => ${errorMsg}`);
-            });
-            if (perfJson) {
-                let tempPerf = this.processPerformanceData(perfJson);
-                perfDataTotal.totalDurTime += tempPerf.totalDurTime;
-                perfDataTotal.connectTime += tempPerf.connectTime;
-                perfDataTotal.dnsTime += tempPerf.dnsTime;
-                perfDataTotal.ttfbTime += tempPerf.ttfbTime;
-                perfDataTotal.downloadTime += tempPerf.downloadTime;
-                perfDataTotal.domIntTime += tempPerf.domIntTime;
-                perfDataTotal.domContentTime += tempPerf.domContentTime;
-                perfDataTotal.domCompleteTime += tempPerf.domCompleteTime;
+        pageObj.on('requestfailed', requestObj => {
+            resStatusTexts[requestObj.url()] = requestObj.failure().errorText;
+            this.errorTriggered(requestObj, websiteEntry);
+        });
+        pageObj.on('requestfinished', finishedEvent => {
+            if (finishedEvent.resourceType() === 'document') {
+                statusCode = finishedEvent.response().status();
             }
-            this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
+            resStatusCodes[finishedEvent.url()] = finishedEvent.response().status();
+        });
+        this.runningBrowserJobs++;
+        this.logObj.debug(`[Browser] Starting performance data collection for ${webUrl}...`);
+        const httpResponse = await pageObj.goto(webUrl, { waitUntil: 'networkidle0' }).catch(errorMsg => {
+            this.logObj.error(`[Browser] An error occured during "Page Goto" => ${errorMsg}`);
+        });
+        if (!httpResponse)
+            return;
+        const perfElementHandler = await pageObj.$('pageData').catch(errorMsg => {
+            this.logObj.error(`[Browser] An error occured during "Performance Element Handling" => ${errorMsg}`);
+        });
+        if (typeof perfElementHandler !== 'object')
+            return;
+        const perfObjects = await pageObj.evaluate(pageData => {
+            const navPerf = JSON.stringify(performance.getEntriesByType('navigation'));
+            const resPerf = JSON.stringify(performance.getEntriesByType('resource'));
+            return {
+                navPerf: navPerf,
+                resPerf: resPerf
+            };
+        }, perfElementHandler).catch(errorMsg => {
+            this.logObj.error(`[Browser] An error occured "Page evaluation" => ${errorMsg}`);
+        });
+        if (!perfObjects) {
+            this.logObj.error('Performance data not returned by getEntriesByType.');
+            return;
         }
+        const perfJson = perfObjects.navPerf;
+        const resourcePerfJson = perfObjects.resPerf;
+        if (perfJson) {
+            perfData = this.processPerformanceData(perfJson);
+        }
+        if (resourcePerfJson) {
+            let resourcePerfArray;
+            const foo = Object.assign({});
+            try {
+                resourcePerfArray = JSON.parse(resourcePerfJson);
+            }
+            catch (_a) {
+                this.logObj.error('Reource performance measurements JSON is not valid');
+            }
+            if (typeof resourcePerfArray !== 'undefined' && resourcePerfArray !== null) {
+                resourcePerfArray.forEach(resourcePerfObj => {
+                    let resourcePerfData = this.processResourcePerformanceData(resourcePerfObj, resStatusCodes, resStatusTexts);
+                    resourcePerfDataArray.push(resourcePerfData);
+                });
+            }
+        }
+        if (statusCode) {
+            perfData.statusCode = statusCode;
+        }
+        this.logObj.debug(`[Browser] Completed performance data collection for ${webUrl}...`);
         pageObj.close();
         this.runningBrowserJobs--;
-        perfData = {
-            totalDurTime: (perfDataTotal.totalDurTime / this.numOfRetries),
-            connectTime: (perfDataTotal.connectTime / this.numOfRetries),
-            dnsTime: (perfDataTotal.dnsTime / this.numOfRetries),
-            ttfbTime: (perfDataTotal.ttfbTime / this.numOfRetries),
-            downloadTime: (perfDataTotal.downloadTime / this.numOfRetries),
-            domIntTime: (perfDataTotal.domIntTime / this.numOfRetries),
-            domContentTime: (perfDataTotal.domContentTime / this.numOfRetries),
-            domCompleteTime: (perfDataTotal.domCompleteTime / this.numOfRetries)
-        };
         this.browserRestartCount = 0;
-        return perfData;
+        return { perfData: perfData, resourcePerfData: resourcePerfDataArray };
     }
     async processPageWithCurl(websiteEntry) {
         return new Promise((retFunc, rejFunc) => {
@@ -158,16 +173,6 @@ class WebsiteBenchBrowser {
             const promiseArray = [];
             let userAgent;
             let perfData = null;
-            const perfDataTotal = {
-                totalDurTime: 0,
-                connectTime: 0,
-                dnsTime: 0,
-                ttfbTime: 0,
-                preTransfer: 0,
-                tlsHandshake: 0,
-                statusCode: 0,
-                statusCodes: []
-            };
             if (this.configObj.userAgent) {
                 userAgent = this.configObj.userAgent;
             }
@@ -175,57 +180,39 @@ class WebsiteBenchBrowser {
                 let browserUserAgent = node_libcurl_1.Curl.defaultUserAgent;
                 userAgent = `${browserUserAgent} websiteBench/${this.configObj.versionNum}`;
             }
-            for (let runCount = 0; runCount < this.numOfRetries; runCount++) {
-                this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl} (Run: ${runCount + 1})...`);
-                const deferObj = qObj.defer();
-                const curlObj = new node_libcurl_1.Curl();
-                curlObj.setOpt('URL', webUrl);
-                curlObj.setOpt('TIMEOUT', reqTimeout);
-                curlObj.setOpt('USERAGENT', userAgent);
-                curlObj.setOpt('DNS_SHUFFLE_ADDRESSES', true);
-                curlObj.setOpt('SSL_VERIFYHOST', this.configObj.ignoreSslErrors === true ? false : true);
-                curlObj.on('end', (statusCode, resData, resHeader, curlInstance) => {
-                    const tempPerf = {
-                        runNumber: runCount,
-                        totalDurTime: curlInstance.getInfo('TOTAL_TIME_T') / 1000,
-                        dnsTime: curlInstance.getInfo('NAMELOOKUP_TIME_T') / 1000,
-                        tlsHandshake: curlInstance.getInfo('APPCONNECT_TIME_T') / 1000,
-                        ttfbTime: curlInstance.getInfo('STARTTRANSFER_TIME_T') / 1000,
-                        preTransfer: curlInstance.getInfo('PRETRANSFER_TIME_T') / 1000,
-                        connectTime: curlInstance.getInfo('CONNECT_TIME_T') / 1000,
-                        statusCode: statusCode
-                    };
-                    deferObj.resolve(tempPerf);
-                    curlInstance.close();
-                });
-                curlObj.on('error', (errorObj) => {
-                    this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`);
-                    this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl} (Run: ${runCount + 1})...`);
-                });
-                curlObj.perform();
-                promiseArray.push(deferObj.promise);
-            }
+            this.logObj.debug(`[cURL] Starting performance data collection for ${webUrl}...`);
+            const deferObj = qObj.defer();
+            const curlObj = new node_libcurl_1.Curl();
+            curlObj.setOpt('URL', webUrl);
+            curlObj.setOpt('TIMEOUT', reqTimeout);
+            curlObj.setOpt('USERAGENT', userAgent);
+            curlObj.setOpt('DNS_SHUFFLE_ADDRESSES', true);
+            curlObj.setOpt('SSL_VERIFYHOST', this.configObj.ignoreSslErrors === true ? false : true);
+            curlObj.on('end', (statusCode, resData, resHeader, curlInstance) => {
+                perfData = {
+                    totalDurTime: curlInstance.getInfo('TOTAL_TIME_T') / 1000,
+                    dnsTime: curlInstance.getInfo('NAMELOOKUP_TIME_T') / 1000,
+                    tlsHandshake: curlInstance.getInfo('APPCONNECT_TIME_T') / 1000,
+                    ttfbTime: curlInstance.getInfo('STARTTRANSFER_TIME_T') / 1000,
+                    preTransfer: curlInstance.getInfo('PRETRANSFER_TIME_T') / 1000,
+                    connectTime: curlInstance.getInfo('CONNECT_TIME_T') / 1000,
+                    statusCode: statusCode,
+                    resourceName: webUrl
+                };
+                deferObj.resolve(perfData);
+                curlInstance.close();
+            });
+            curlObj.on('error', (errorObj) => {
+                this.logObj.error(`Unable to fetch page via cURL: ${errorObj.message}`);
+                this.logObj.debug(`[cURL] Completed performance data collection with error for ${webUrl}...`);
+            });
+            curlObj.perform();
+            promiseArray.push(deferObj.promise);
             qObj.all(promiseArray).then(resPromise => {
                 resPromise.forEach(curlPromise => {
-                    perfDataTotal.totalDurTime += curlPromise.totalDurTime;
-                    perfDataTotal.connectTime += curlPromise.connectTime;
-                    perfDataTotal.dnsTime += curlPromise.dnsTime;
-                    perfDataTotal.ttfbTime += curlPromise.ttfbTime;
-                    perfDataTotal.tlsHandshake += curlPromise.tlsHandshake;
-                    perfDataTotal.preTransfer += curlPromise.preTransfer;
-                    perfDataTotal.statusCodes.push(curlPromise.statusCode);
-                    this.logObj.debug(`[cURL] Completed performance data collection for ${webUrl} (Run: ${curlPromise.runNumber})...`);
+                    this.logObj.debug(`[cURL] Completed performance data collection for ${webUrl}...`);
                 });
             }).finally(() => {
-                perfData = {
-                    totalDurTime: (perfDataTotal.totalDurTime / this.numOfRetries),
-                    connectTime: (perfDataTotal.connectTime / this.numOfRetries),
-                    dnsTime: (perfDataTotal.dnsTime / this.numOfRetries),
-                    ttfbTime: (perfDataTotal.ttfbTime / this.numOfRetries),
-                    tlsHandshake: (perfDataTotal.tlsHandshake / this.numOfRetries),
-                    preTransfer: (perfDataTotal.preTransfer / this.numOfRetries),
-                };
-                perfData.statusCodesString = perfDataTotal.statusCodes.join(':');
                 retFunc(perfData);
             });
         });
@@ -266,9 +253,49 @@ class WebsiteBenchBrowser {
             perfData.connectTime = (perfEntry.connectEnd - perfEntry.connectStart);
             perfData.ttfbTime = (perfEntry.responseStart - perfEntry.requestStart);
             perfData.downloadTime = (perfEntry.responseEnd - perfEntry.responseStart);
+            perfData.redirectTime = (perfEntry.redirectEnd - perfEntry.redirectStart);
             perfData.domIntTime = (perfEntry.domInteractive - perfEntry.responseEnd);
             perfData.domContentTime = (perfEntry.domContentLoadedEventEnd - perfEntry.domContentLoadedEventStart);
             perfData.domCompleteTime = (perfEntry.domComplete - perfEntry.domContentLoadedEventEnd);
+            perfData.transferSize = perfEntry.transferSize;
+            perfData.encodedBodySize = perfEntry.encodedBodySize;
+            perfData.decodedBodySize = perfEntry.decodedBodySize;
+            perfData.initiatorType = perfEntry.initiatorType;
+            perfData.tlsHandshake = (perfEntry.secureConnectionStart - perfEntry.connectStart);
+            perfData.resourceName = perfEntry.name;
+            perfData.entryType = perfEntry.entryType;
+            perfData.redirectCount = perfEntry.redirectCount;
+        }
+        return perfData;
+    }
+    processResourcePerformanceData(resourcePerfData, statusCodes, statusTexts) {
+        let perfData = Object.assign({});
+        if (resourcePerfData !== null) {
+            perfData.totalDurTime = resourcePerfData.duration;
+            perfData.dnsTime = (resourcePerfData.domainLookupEnd - resourcePerfData.domainLookupStart);
+            perfData.connectTime = (resourcePerfData.connectEnd - resourcePerfData.connectStart);
+            perfData.ttfbTime = (resourcePerfData.responseStart - resourcePerfData.requestStart);
+            perfData.downloadTime = (resourcePerfData.responseEnd - resourcePerfData.responseStart);
+            perfData.redirectTime = (resourcePerfData.redirectEnd - resourcePerfData.redirectStart);
+            perfData.transferSize = resourcePerfData.transferSize;
+            perfData.encodedBodySize = resourcePerfData.encodedBodySize;
+            perfData.decodedBodySize = resourcePerfData.decodedBodySize;
+            perfData.initiatorType = resourcePerfData.initiatorType;
+            perfData.tlsHandshake = (resourcePerfData.secureConnectionStart - resourcePerfData.connectStart);
+            perfData.startTime = resourcePerfData.startTime;
+            perfData.entryType = resourcePerfData.entryType;
+            if (typeof resourcePerfData.name !== 'undefined' && resourcePerfData.name !== null) {
+                let urlSplit = resourcePerfData.name.split('?');
+                perfData.resourceName = urlSplit[0];
+            }
+            let resStatusCode = statusCodes[resourcePerfData.name];
+            if (typeof resStatusCode !== 'undefined' && resStatusCode !== null) {
+                perfData.statusCode = resStatusCode;
+            }
+            let resStatusText = statusTexts[resourcePerfData.name];
+            if (typeof resStatusText !== 'undefined' && resStatusText !== null) {
+                perfData.errorText = resStatusText;
+            }
         }
         return perfData;
     }

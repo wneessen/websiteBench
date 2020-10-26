@@ -25,6 +25,10 @@ class WebsiteBenchEvents extends events_1.EventEmitter {
             this.logObj.warn(`${websiteObj.siteUrl} already scheduled. Not scheduling a second time.`);
             return;
         }
+        if (websiteObj.isDisabled) {
+            this.logObj.debug(`Website entry "${websiteObj.siteName} is set to disabled. Skipping.`);
+            return;
+        }
         this.logObj.debug(`Adding EventListener for Site "${websiteObj.siteName}"`);
         this.addListener(websiteObj.siteName, () => {
             setImmediate(() => {
@@ -56,20 +60,40 @@ class WebsiteBenchEvents extends events_1.EventEmitter {
         }
         this._currentlyRunning++;
         setTimeout(async () => {
-            let perfJson;
+            let perfJson, perfResourceJson;
             let checkType = ('checkType' in websiteEntry && websiteEntry.checkType === 'curl') ? 'cURL' : 'Browser';
             this.logObj.debug(`Executing perfomance check for site: ${websiteEntry.siteName} (via ${checkType})`);
             if (checkType === 'cURL') {
+                const additionalTags = Object.assign({
+                    checkType: 'cURL',
+                });
+                const startTime = Date.now();
                 perfJson = await this._browserObj.processPageWithCurl(websiteEntry);
+                additionalTags.url = websiteEntry.siteUrl;
+                additionalTags.resource_type = 'navigation';
+                const processingTime = Date.now() - startTime;
+                this.logObj.debug(`Performance check completed in ${processingTime / 1000} seconds`);
+                this.sendDataToInflux(websiteEntry, perfJson, additionalTags);
             }
             else {
-                perfJson = await this._browserObj.processPageWithBrowser(websiteEntry);
+                const additionalTags = Object.assign({
+                    checkType: 'browser',
+                });
+                const startTime = Date.now();
+                const perfObj = await this._browserObj.processPageWithBrowser(websiteEntry);
+                perfJson = perfObj.perfData;
+                this.sendDataToInflux(websiteEntry, perfJson, additionalTags);
+                perfResourceJson = perfObj.resourcePerfData;
+                perfResourceJson.forEach(perfResource => {
+                    this.sendDataToInflux(websiteEntry, perfResource, additionalTags);
+                });
+                const processingTime = Date.now() - startTime;
+                this.logObj.debug(`Performance check completed in ${processingTime / 1000} seconds`);
             }
             this._currentlyRunning--;
-            this.sendDataToInflux(websiteEntry, perfJson);
         }, shortDelay);
     }
-    async sendDataToInflux(websiteEntry, perfJson) {
+    async sendDataToInflux(websiteEntry, perfJson, additionalTags) {
         if (perfJson) {
             await this._influxDbClient.writePoints([
                 {
@@ -77,19 +101,30 @@ class WebsiteBenchEvents extends events_1.EventEmitter {
                     tags: {
                         website: websiteEntry.siteName,
                         instance: this._configObj.instanceName,
+                        url: perfJson.resourceName,
+                        initiator_type: perfJson.initiatorType ? perfJson.initiatorType : 'none',
+                        resource_type: perfJson.entryType ? perfJson.entryType : '',
+                        ...additionalTags
                     },
                     fields: {
-                        total: perfJson.totalDurTime ? perfJson.totalDurTime : -1,
-                        dns: perfJson.dnsTime ? perfJson.dnsTime : -1,
-                        connect: perfJson.connectTime ? perfJson.connectTime : -1,
-                        ttfb: perfJson.ttfbTime ? perfJson.ttfbTime : -1,
-                        download: perfJson.downloadTime ? perfJson.downloadTime : -1,
-                        tlsHandshake: perfJson.tlsHandshake ? perfJson.tlsHandshake : -1,
-                        preTransfer: perfJson.preTransfer ? perfJson.preTransfer : -1,
-                        statusCodes: perfJson.statusCodesString ? perfJson.statusCodesString : '',
-                        dom_int: perfJson.domIntTime ? perfJson.domIntTime : -1,
-                        dom_content: perfJson.domContentTime ? perfJson.domContentTime : -1,
-                        dom_complete: perfJson.domCompleteTime ? perfJson.domCompleteTime : -1
+                        total: perfJson.totalDurTime ? perfJson.totalDurTime : 0,
+                        dns: perfJson.dnsTime ? perfJson.dnsTime : 0,
+                        connect: perfJson.connectTime ? perfJson.connectTime : 0,
+                        ttfb: perfJson.ttfbTime ? perfJson.ttfbTime : 0,
+                        download: perfJson.downloadTime ? perfJson.downloadTime : 0,
+                        tls_handshake: perfJson.tlsHandshake ? perfJson.tlsHandshake : 0,
+                        pre_transfer: perfJson.preTransfer ? perfJson.preTransfer : 0,
+                        status_code: perfJson.statusCode ? perfJson.statusCode : 0,
+                        dom_int: perfJson.domIntTime ? perfJson.domIntTime : 0,
+                        dom_content: perfJson.domContentTime ? perfJson.domContentTime : 0,
+                        dom_complete: perfJson.domCompleteTime ? perfJson.domCompleteTime : 0,
+                        transfer_size: perfJson.transferSize ? perfJson.transferSize : 0,
+                        encoded_bodysize: perfJson.encodedBodySize ? perfJson.encodedBodySize : 0,
+                        decoded_bodysize: perfJson.decodedBodySize ? perfJson.decodedBodySize : 0,
+                        start_time: perfJson.startTime ? perfJson.startTime : 0,
+                        redirect_count: perfJson.redirectCount ? perfJson.redirectCount : 0,
+                        redirect_time: perfJson.redirectTime ? perfJson.redirectTime : 0,
+                        error_text: perfJson.errorText ? perfJson.errorText : ''
                     }
                 }
             ]).catch(errorObj => {

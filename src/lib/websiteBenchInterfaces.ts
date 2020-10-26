@@ -31,6 +31,7 @@ interface IWebsiteEntry {
     siteName: string,
     siteUrl: string,
     checkInterval: number,
+    isDisabled: boolean,
     checkType?: "curl"|"browser"
 }
 
@@ -81,9 +82,17 @@ interface IPerformanceData {
     tlsHandshake?: number,
     preTransfer?: number,
     statusCode?: number,
-    statusCodes?: Array<number>,
-    statusCodesString?: string,
-    runNumber?: number
+    redirectTime?: number,
+    redirectCount?: number,
+    initiatorType?: string,
+    transferSize?: number,
+    encodedBodySize?: number,
+    decodedBodySize?: number,
+    startTime?: number,
+    resourceName?: string,
+    entryType?: string,
+    errorText?: string
+
 }
 
 /**
@@ -107,5 +116,24 @@ interface IConfigFiles {
     secretsFile: string
 }
 
+/**
+ * Return object with resource and document performance data
+ *
+ * @interface IBrowserPerfReturn
+*/
+interface IBrowserPerfReturn {
+    resourcePerfData: Array<IPerformanceData>,
+    perfData: IPerformanceData
+}
+
+/**
+ * General object literal
+ *
+ * @interface IObjectLiteral
+*/
+interface IObjectLiteral {
+    [key: string]: any
+}
+
 // Exports
-export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles }
+export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles, IBrowserPerfReturn, IObjectLiteral }
