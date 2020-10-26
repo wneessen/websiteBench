@@ -1,7 +1,7 @@
 import Puppeteer from 'puppeteer';
 import { Curl } from 'node-libcurl';
 import WebsiteBenchTools from './websiteBenchTools';
-import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry, IBrowserPerfReturn } from './websiteBenchInterfaces';
+import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry, IBrowserPerfReturn, IObjectLiteral } from './websiteBenchInterfaces';
 import { Logger } from 'tslog';
 import * as qObj from 'q'
 import { errorMonitor } from 'stream';
@@ -61,6 +61,8 @@ export default class WebsiteBenchBrowser {
         let perfData: IPerformanceData = null;
         let resourcePerfDataArray: Array<IPerformanceData> = [];
         let statusCode: number;
+        let resStatusCodes: IObjectLiteral = [];
+        let resStatusTexts: IObjectLiteral = [];
 
         if(!this.browserIsReady()) return
 
@@ -80,6 +82,7 @@ export default class WebsiteBenchBrowser {
                 return null;
             })
         if(pageObj === null) return;
+        if(this.configObj.allowCaching === false) { await pageObj.setCacheEnabled(false) }
 
         // Set User-Agent
         if(this.configObj.userAgent) {
@@ -100,11 +103,15 @@ export default class WebsiteBenchBrowser {
         // Assign event handler
         pageObj.on('console', eventObj => this.eventTriggered(eventObj));
         pageObj.on('dialog', eventObj => this.eventTriggered(eventObj));
-        pageObj.on('requestfailed', requestObj => this.errorTriggered(requestObj, websiteEntry));
+        pageObj.on('requestfailed', requestObj => {
+            resStatusTexts[requestObj.url()] = requestObj.failure().errorText;
+            this.errorTriggered(requestObj, websiteEntry);
+        });
         pageObj.on('requestfinished', finishedEvent => {
             if(finishedEvent.resourceType() === 'document') {
                 statusCode = finishedEvent.response().status();
             }
+            resStatusCodes[finishedEvent.url()] = finishedEvent.response().status();
         })
 
         // Open the website for number of retries
@@ -120,16 +127,22 @@ export default class WebsiteBenchBrowser {
             this.logObj.error(`[Browser] An error occured during "Performance Element Handling" => ${errorMsg}`);
         });
         if(typeof perfElementHandler !== 'object') return;
-        const perfJson = await pageObj.evaluate(pageData => {
-            return JSON.stringify(performance.getEntriesByType('navigation'));
+        const perfObjects = await pageObj.evaluate(pageData => {
+            const navPerf = JSON.stringify(performance.getEntriesByType('navigation'));
+            const resPerf = JSON.stringify(performance.getEntriesByType('resource'));
+            return {
+                navPerf: navPerf,
+                resPerf: resPerf
+            }
         }, perfElementHandler).catch(errorMsg => {
             this.logObj.error(`[Browser] An error occured "Page evaluation" => ${errorMsg}`)
         });
-        const resourcePerfJson = await pageObj.evaluate(pageData => {
-            return JSON.stringify(performance.getEntriesByType('resource'));
-        }, perfElementHandler).catch(errorMsg => {
-            this.logObj.error(`[Browser] An error occured "Page evaluation (resources)" => ${errorMsg}`)
-        });
+        if(!perfObjects) {
+            this.logObj.error('Performance data not returned by getEntriesByType.');
+            return;
+        }
+        const perfJson = perfObjects.navPerf;
+        const resourcePerfJson = perfObjects.resPerf;
         if(perfJson) { perfData = this.processPerformanceData(perfJson); }
         if(resourcePerfJson) {
             let resourcePerfArray;
@@ -142,7 +155,7 @@ export default class WebsiteBenchBrowser {
             }
             if(typeof resourcePerfArray !== 'undefined' && resourcePerfArray !== null) {
                 resourcePerfArray.forEach(resourcePerfObj => {
-                    let resourcePerfData = this.processResourcePerformanceData(resourcePerfObj);
+                    let resourcePerfData = this.processResourcePerformanceData(resourcePerfObj, resStatusCodes, resStatusTexts);
                     resourcePerfDataArray.push(resourcePerfData);
                 });
             }
@@ -202,7 +215,8 @@ export default class WebsiteBenchBrowser {
                     ttfbTime: curlInstance.getInfo('STARTTRANSFER_TIME_T') as number / 1000,
                     preTransfer: curlInstance.getInfo('PRETRANSFER_TIME_T') as number / 1000,
                     connectTime: curlInstance.getInfo('CONNECT_TIME_T') as number / 1000,
-                    statusCode: statusCode
+                    statusCode: statusCode,
+                    resourceName: webUrl
                 }
                 deferObj.resolve(perfData);
                 curlInstance.close();
@@ -293,9 +307,18 @@ export default class WebsiteBenchBrowser {
             perfData.connectTime =(perfEntry.connectEnd - perfEntry.connectStart);
             perfData.ttfbTime = (perfEntry.responseStart - perfEntry.requestStart);
             perfData.downloadTime = (perfEntry.responseEnd - perfEntry.responseStart);
+            perfData.redirectTime = (perfEntry.redirectEnd - perfEntry.redirectStart);
             perfData.domIntTime = (perfEntry.domInteractive - perfEntry.responseEnd);
             perfData.domContentTime = (perfEntry.domContentLoadedEventEnd - perfEntry.domContentLoadedEventStart);
             perfData.domCompleteTime = (perfEntry.domComplete - perfEntry.domContentLoadedEventEnd);
+            perfData.transferSize = perfEntry.transferSize;
+            perfData.encodedBodySize = perfEntry.encodedBodySize;
+            perfData.decodedBodySize = perfEntry.decodedBodySize;
+            perfData.initiatorType = perfEntry.initiatorType;
+            perfData.tlsHandshake = (perfEntry.secureConnectionStart - perfEntry.connectStart);
+            perfData.resourceName = perfEntry.name;
+            perfData.entryType = perfEntry.entryType;
+            perfData.redirectCount = perfEntry.redirectCount;
         }
 
         return perfData;
@@ -308,7 +331,7 @@ export default class WebsiteBenchBrowser {
      * @returns {IPerformanceData}
      * @memberof WebsiteBenchBrowser
     */
-    private processResourcePerformanceData(resourcePerfData: PerformanceResourceTiming): IPerformanceData {
+    private processResourcePerformanceData(resourcePerfData: PerformanceResourceTiming, statusCodes: IObjectLiteral, statusTexts: IObjectLiteral): IPerformanceData {
         let perfData = Object.assign({});
         if(resourcePerfData !== null) {
             perfData.totalDurTime = resourcePerfData.duration;
@@ -316,6 +339,26 @@ export default class WebsiteBenchBrowser {
             perfData.connectTime =(resourcePerfData.connectEnd - resourcePerfData.connectStart);
             perfData.ttfbTime = (resourcePerfData.responseStart - resourcePerfData.requestStart);
             perfData.downloadTime = (resourcePerfData.responseEnd - resourcePerfData.responseStart);
+            perfData.redirectTime = (resourcePerfData.redirectEnd - resourcePerfData.redirectStart);
+            perfData.transferSize = resourcePerfData.transferSize;
+            perfData.encodedBodySize = resourcePerfData.encodedBodySize;
+            perfData.decodedBodySize = resourcePerfData.decodedBodySize;
+            perfData.initiatorType = resourcePerfData.initiatorType;
+            perfData.tlsHandshake = (resourcePerfData.secureConnectionStart - resourcePerfData.connectStart);
+            perfData.startTime = resourcePerfData.startTime;
+            perfData.entryType = resourcePerfData.entryType;
+            if(typeof resourcePerfData.name !== 'undefined' && resourcePerfData.name !== null) {
+                let urlSplit = resourcePerfData.name.split('?');
+                perfData.resourceName = urlSplit[0];
+            }
+            let resStatusCode = statusCodes[resourcePerfData.name];
+            if(typeof resStatusCode !== 'undefined' && resStatusCode !== null) {
+                perfData.statusCode = resStatusCode;
+            }
+            let resStatusText = statusTexts[resourcePerfData.name];
+            if(typeof resStatusText !== 'undefined' && resStatusText !== null) {
+                perfData.errorText = resStatusText;
+            }
         }
 
         return perfData;

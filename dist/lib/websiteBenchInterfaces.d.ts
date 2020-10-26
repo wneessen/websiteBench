@@ -49,6 +49,16 @@ interface IPerformanceData {
     tlsHandshake?: number;
     preTransfer?: number;
     statusCode?: number;
+    redirectTime?: number;
+    redirectCount?: number;
+    initiatorType?: string;
+    transferSize?: number;
+    encodedBodySize?: number;
+    decodedBodySize?: number;
+    startTime?: number;
+    resourceName?: string;
+    entryType?: string;
+    errorText?: string;
 }
 interface IConfigError {
     hasError: boolean;
@@ -63,5 +73,8 @@ interface IBrowserPerfReturn {
     resourcePerfData: Array<IPerformanceData>;
     perfData: IPerformanceData;
 }
-export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles, IBrowserPerfReturn };
+interface IObjectLiteral {
+    [key: string]: any;
+}
+export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles, IBrowserPerfReturn, IObjectLiteral };
 //# sourceMappingURL=websiteBenchInterfaces.d.ts.map

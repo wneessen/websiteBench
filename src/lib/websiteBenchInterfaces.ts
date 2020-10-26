@@ -81,7 +81,18 @@ interface IPerformanceData {
     domCompleteTime?: number,
     tlsHandshake?: number,
     preTransfer?: number,
-    statusCode?: number
+    statusCode?: number,
+    redirectTime?: number,
+    redirectCount?: number,
+    initiatorType?: string,
+    transferSize?: number,
+    encodedBodySize?: number,
+    decodedBodySize?: number,
+    startTime?: number,
+    resourceName?: string,
+    entryType?: string,
+    errorText?: string
+
 }
 
 /**
@@ -115,5 +126,14 @@ interface IBrowserPerfReturn {
     perfData: IPerformanceData
 }
 
+/**
+ * General object literal
+ *
+ * @interface IObjectLiteral
+*/
+interface IObjectLiteral {
+    [key: string]: any
+}
+
 // Exports
-export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles, IBrowserPerfReturn }
+export { IWebsiteBenchConfig, IWebsiteEntry, IInfluxDbConfig, IUserCredentials, IPerformanceData, IConfigError, IConfigFiles, IBrowserPerfReturn, IObjectLiteral }
