@@ -63,6 +63,7 @@ try {
         '--ignore-ssl-errors': Boolean,
         '--no-headless': Boolean,
         '--no-sandbox': Boolean,
+        '--no-http2': Boolean,
         '--log-resource-errors': Boolean,
         '--help': Boolean,
         '--debug': Boolean,
@@ -90,6 +91,10 @@ if (typeof cliArgs["--no-headless"] !== 'undefined') {
 ;
 if (typeof cliArgs["--no-sandbox"] !== 'undefined') {
     pupLaunchOptions.args.push('--no-sandbox');
+}
+;
+if (typeof cliArgs["--no-http2"] !== 'undefined') {
+    pupLaunchOptions.args.push('--disable-http2');
 }
 ;
 if (typeof cliArgs["--browserpath"] !== 'undefined') {
@@ -164,6 +169,7 @@ function showHelp() {
     console.log('  -h, --help\t\t\t\tShow this help text');
     console.log('  --log-resource-errors\t\t\tIf set, the browser will start in non-headless mode');
     console.log('  --no-headless\t\t\t\tIf set, the browser will start in non-headless mode');
+    console.log('  --no-http2\t\t\t\tIf set, the browser will not performance any HTTP/2 requests, even if  the server supports it');
     console.log('  --no-sandbox\t\t\t\tIf set, the browser is started in no-sandbox mode (DANGER: Only use if you are sure what you are doing)');
     console.log('  --browserpath <path>\t\t\tPath to browser executable (Using Firefox requires --browsertype firefox)');
     console.log('  --browsertype <firefox|chrome>\tType of browser to use (Requires --browserpath to be set)');

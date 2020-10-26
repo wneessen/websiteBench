@@ -131,6 +131,7 @@ The server provides the following CLI parameters to override defaults
 - ```-s, --secrets <filepath> ```: Path to secrets config file (this is helpful in case you want to seperate username/password/token from the normal config)
 - ```-d, --debug```: Enable DEBUG mode (more logging)
 - ```--no-headless```: If set, the browser will start in non-headless mode
+- ```--no-http2```: If set, the browser will not use HTTP/2 requests, even if the server side supports it
 - ```--no-sandbox```: If set, the browser is started in no-sandbox mode (**DANGEROUS**: Only use if you are sure what you are doing)
 - ```--ignore-ssl-errors```: Ignore HTTPS errors
 - ```--log-resource-errors```: If set, resource errors of the web requests will be logged
