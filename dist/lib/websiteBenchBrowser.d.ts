@@ -13,6 +13,7 @@ export default class WebsiteBenchBrowser {
     private browserRestartCount;
     private restartInterval;
     private runningBrowserJobs;
+    private isForcedRestart;
     constructor(configObj: IWebsiteBenchConfig, logObj: Logger, isBrowserNeeded: boolean);
     processPageWithBrowser(websiteEntry: IWebsiteEntry): Promise<IBrowserPerfReturn>;
     processPageWithCurl(websiteEntry: IWebsiteEntry): Promise<IPerformanceData>;

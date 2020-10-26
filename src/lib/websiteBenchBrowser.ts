@@ -19,6 +19,7 @@ export default class WebsiteBenchBrowser {
     private browserRestartCount = 0;
     private restartInterval = 1800000;
     private runningBrowserJobs = 0;
+    private isForcedRestart = false;
     
     /**
      * Constructor
@@ -35,6 +36,7 @@ export default class WebsiteBenchBrowser {
             setInterval(async () => {
                 if(this.runningBrowserJobs === 0) {
                     this.logObj.debug('Trying to automatically restart browser...');
+                    this.isForcedRestart = true;
                     if(this.browserObj.isConnected()) {
                         this.isLaunching = true;
                         await this.browserObj.close().catch(errorObj => {
@@ -261,7 +263,12 @@ export default class WebsiteBenchBrowser {
      * @memberof WebsiteBenchBrowser
     */
     private async browserDisconnectEvent(): Promise<void> {
-        this.logObj.warn('The browser got disconnected. Trying to reconnect/restart...');
+        if(this.isForcedRestart) {
+            this.logObj.debug('The browser got disconnected due to forced restart. Trying to reconnect/restart...');
+        }
+        else {
+            this.logObj.warn('The browser got disconnected. Trying to reconnect/restart...');
+        }
         this.browserObj = await Puppeteer.connect({browserWSEndpoint: this.browserWsEndpoint}).catch(errorObj => {
             return null;
         });
@@ -270,6 +277,9 @@ export default class WebsiteBenchBrowser {
                 this.logObj.error(`Unable to restart browser: ${errorObj.message}. Quitting.`);
                 process.exit(1);
             });
+        }
+        else {
+            this.isForcedRestart = false;
         }
     }
 
