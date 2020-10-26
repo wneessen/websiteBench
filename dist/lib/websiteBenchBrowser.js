@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -36,6 +36,7 @@ class WebsiteBenchBrowser {
         this.browserRestartCount = 0;
         this.restartInterval = 1800000;
         this.runningBrowserJobs = 0;
+        this.isForcedRestart = false;
         this.configObj = configObj;
         this.logObj = logObj;
         this.isBrowserNeeded = isBrowserNeeded;
@@ -43,6 +44,7 @@ class WebsiteBenchBrowser {
             setInterval(async () => {
                 if (this.runningBrowserJobs === 0) {
                     this.logObj.debug('Trying to automatically restart browser...');
+                    this.isForcedRestart = true;
                     if (this.browserObj.isConnected()) {
                         this.isLaunching = true;
                         await this.browserObj.close().catch(errorObj => {
@@ -223,7 +225,12 @@ class WebsiteBenchBrowser {
         }
     }
     async browserDisconnectEvent() {
-        this.logObj.warn('The browser got disconnected. Trying to reconnect/restart...');
+        if (this.isForcedRestart) {
+            this.logObj.debug('The browser got disconnected due to forced restart. Trying to reconnect/restart...');
+        }
+        else {
+            this.logObj.warn('The browser got disconnected. Trying to reconnect/restart...');
+        }
         this.browserObj = await puppeteer_1.default.connect({ browserWSEndpoint: this.browserWsEndpoint }).catch(errorObj => {
             return null;
         });
@@ -232,6 +239,9 @@ class WebsiteBenchBrowser {
                 this.logObj.error(`Unable to restart browser: ${errorObj.message}. Quitting.`);
                 process.exit(1);
             });
+        }
+        else {
+            this.isForcedRestart = false;
         }
     }
     async errorTriggered(requestObj, websiteEntry) {
