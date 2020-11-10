@@ -4,7 +4,6 @@ import WebsiteBenchTools from './websiteBenchTools';
 import { IWebsiteBenchConfig, IPerformanceData, IWebsiteEntry, IBrowserPerfReturn, IObjectLiteral } from './websiteBenchInterfaces';
 import { Logger } from 'tslog';
 import * as qObj from 'q'
-import { errorMonitor } from 'stream';
 
 export default class WebsiteBenchBrowser {
     private browserObj: Puppeteer.Browser;

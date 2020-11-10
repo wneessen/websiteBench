@@ -80,6 +80,9 @@ export default class WebsiteBenchInflux {
             }
             else {
                 this._bucketsApi.getBuckets({name: this._configObj.influxDb.database}).then(bucketObj => {
+                    if(bucketObj.buckets.length <= 0) {
+                        rejFunc(new Error('Access token lacks permissions to access bucket/database.'));
+                    }
                     const thisBucket = bucketObj.buckets[0];
                     if(thisBucket.name === this._configObj.influxDb.database) {
                         retFunc(true);
