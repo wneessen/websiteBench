@@ -5,7 +5,7 @@ const process_1 = require("process");
 class WebsiteBenchConfig {
     constructor(confFiles, logObj) {
         this._configObj = {};
-        this._versionNum = '2.0.2';
+        this._versionNum = '2.0.3';
         this._allowCaching = false;
         this._ignoreSslErrors = false;
         this._logResourceErrors = false;

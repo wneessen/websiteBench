@@ -14,7 +14,7 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
 };
@@ -78,6 +78,9 @@ class WebsiteBenchInflux {
             }
             else {
                 this._bucketsApi.getBuckets({ name: this._configObj.influxDb.database }).then(bucketObj => {
+                    if (bucketObj.buckets.length <= 0) {
+                        rejFunc(new Error('Access token lacks permissions to access bucket/database.'));
+                    }
                     const thisBucket = bucketObj.buckets[0];
                     if (thisBucket.name === this._configObj.influxDb.database) {
                         retFunc(true);
