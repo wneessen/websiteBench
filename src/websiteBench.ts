@@ -7,9 +7,8 @@ import WebsiteBenchEvents from './lib/websiteBenchEvents';
 import WebsiteBenchTools from './lib/websiteBenchTools';
 import { IConfigFiles, IWebsiteBenchConfig } from './lib/websiteBenchInterfaces';
 import Puppeteer from 'puppeteer';
-import { Curl } from 'node-libcurl';
 import arg from 'arg';
-import { ILogObject, Logger } from 'tslog';
+import { Logger } from 'tslog';
 import process, { exit } from 'process';
 
 // Signal handler
@@ -168,5 +167,4 @@ function showHelp(): void {
     console.log('  --browserpath <path>\t\t\tPath to browser executable (Using Firefox requires --browsertype firefox)');
     console.log('  --browsertype <firefox|chrome>\tType of browser to use (Requires --browserpath to be set)');
 }
-
 startServer();

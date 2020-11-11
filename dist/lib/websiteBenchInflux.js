@@ -86,7 +86,7 @@ class WebsiteBenchInflux {
                         retFunc(true);
                     }
                 }).catch(errorObj => {
-                    const errorBody = JSON.parse(errorObj.body);
+                    const errorBody = ('body' in errorObj) ? JSON.parse(errorObj.body) : errorObj;
                     rejFunc(errorBody);
                 });
             }
@@ -113,23 +113,25 @@ class WebsiteBenchInflux {
         });
     }
     async writePointsV2(dataPoints) {
-        this._logObj.debug('[InfluxDB Client v2] Sending data to InfluxDB');
-        dataPoints.forEach(curPoint => {
-            let dataPoint = new influxDbClientObj.Point(curPoint.measurement);
-            for (const tagKey in curPoint.tags) {
-                dataPoint.tag(tagKey, curPoint.tags[tagKey]);
-            }
-            for (const fieldKey in curPoint.fields) {
-                if (typeof curPoint.fields[fieldKey] === 'number') {
-                    dataPoint.floatField(fieldKey, curPoint.fields[fieldKey]);
+        return new Promise((retFunc, rejFunc) => {
+            this._logObj.debug('[InfluxDB Client v2] Sending data to InfluxDB');
+            dataPoints.forEach(async (curPoint) => {
+                let dataPoint = new influxDbClientObj.Point(curPoint.measurement);
+                for (const tagKey in curPoint.tags) {
+                    dataPoint.tag(tagKey, curPoint.tags[tagKey]);
                 }
-                else {
-                    dataPoint.stringField(fieldKey, curPoint.fields[fieldKey]);
+                for (const fieldKey in curPoint.fields) {
+                    if (typeof curPoint.fields[fieldKey] === 'number') {
+                        dataPoint.floatField(fieldKey, curPoint.fields[fieldKey]);
+                    }
+                    else {
+                        dataPoint.stringField(fieldKey, curPoint.fields[fieldKey]);
+                    }
                 }
-            }
-            this._writeApi.writePoint(dataPoint);
+                this._writeApi.writePoint(dataPoint);
+            });
+            this._writeApi.flush().then(okObj => retFunc(okObj)).catch(errObj => rejFunc(errObj));
         });
-        this._writeApi.flush().catch(errorObj => { throw errorObj; });
     }
 }
 exports.default = WebsiteBenchInflux;
