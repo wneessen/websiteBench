@@ -81,12 +81,22 @@ class WebsiteBenchEvents extends events_1.EventEmitter {
                 });
                 const startTime = Date.now();
                 const perfObj = await this._browserObj.processPageWithBrowser(websiteEntry);
-                perfJson = perfObj.perfData;
-                this.sendDataToInflux(websiteEntry, perfJson, additionalTags);
-                perfResourceJson = perfObj.resourcePerfData;
-                perfResourceJson.forEach(perfResource => {
-                    this.sendDataToInflux(websiteEntry, perfResource, additionalTags);
-                });
+                if ('perfData' in perfObj && typeof perfObj.perfData !== 'undefined' && perfObj.perfData !== null) {
+                    perfJson = perfObj.perfData;
+                    this.sendDataToInflux(websiteEntry, perfJson, additionalTags);
+                }
+                else {
+                    this.logObj.warn('Request did not return any performance data. Not sending to InfluxDB');
+                }
+                if ('resourcePerfData' in perfObj && typeof perfObj.resourcePerfData !== 'undefined' && perfObj.resourcePerfData !== null) {
+                    perfResourceJson = perfObj.resourcePerfData;
+                    perfResourceJson.forEach(perfResource => {
+                        this.sendDataToInflux(websiteEntry, perfResource, additionalTags);
+                    });
+                }
+                else {
+                    this.logObj.warn('Request did not return any resource performance data. Not sending to InfluxDB');
+                }
                 const processingTime = Date.now() - startTime;
                 this.logObj.debug(`Performance check completed in ${processingTime / 1000} seconds`);
             }
